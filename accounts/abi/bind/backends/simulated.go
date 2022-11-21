@@ -823,6 +823,9 @@ func (m callMsg) Gas() uint64                  { return m.CallMsg.Gas }
 func (m callMsg) Value() *big.Int              { return m.CallMsg.Value }
 func (m callMsg) Data() []byte                 { return m.CallMsg.Data }
 func (m callMsg) AccessList() types.AccessList { return m.CallMsg.AccessList }
+//func (m callMsg) UpdateData(new []byte)  	   { m.CallMsg.UpdateData }
+//func (m callMsg) UpdateTo(new *common.Address) { m.CallMsg.UpdateTo }
+func (m callMsg) Type()	byte			 	   { return m.CallMsg.Type }
 
 // filterBackend implements filters.Backend to support filtering for logs without
 // taking bloom-bits acceleration structures into account.

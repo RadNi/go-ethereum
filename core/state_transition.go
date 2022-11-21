@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/rsa"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -77,6 +78,10 @@ type Message interface {
 	IsFake() bool
 	Data() []byte
 	AccessList() types.AccessList
+
+	UpdateData([]byte)
+	Type() byte
+	UpdateTo(*common.Address)
 }
 
 // ExecutionResult includes all output after executing given evm
@@ -276,14 +281,28 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
-	// 1. the nonce of the message caller is correct
-	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
-	// 3. the amount of gas required is available in the block
-	// 4. the purchased gas is enough to cover intrinsic usage
-	// 5. there is no overflow when calculating intrinsic gas
-	// 6. caller has enough balance to cover asset transfer for **topmost** call
+	// 1. decrypt the transaction if needed (added)
+	// 2. the nonce of the message caller is correct
+	// 3. caller has enough balance to cover transaction fee(gaslimit * gasprice)
+	// 4. the amount of gas required is available in the block
+	// 5. the purchased gas is enough to cover intrinsic usage
+	// 6. there is no overflow when calculating intrinsic gas
+	// 7. caller has enough balance to cover asset transfer for **topmost** call
 
 	// Check clauses 1-3, buy gas if everything is correct
+
+	if st.msg.Type() == types.EncryptedTxType {
+		prv := rsa.ImportPrivateKey()
+		decryptedData := rsa.Decrypt(st.data, prv)
+		decryptedTo := common.BytesToAddress(rsa.Decrypt((*st.msg.To()).Bytes(), prv))
+		st.data = decryptedData
+		st.msg.UpdateData(decryptedData)
+
+		st.msg.UpdateTo(&decryptedTo)
+		//st.msg.data = decryptedData
+		//st.msg.to = decryptedTo
+	}
+
 	if err := st.preCheck(); err != nil {
 		return nil, err
 	}

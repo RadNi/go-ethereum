@@ -45,6 +45,7 @@ const (
 	LegacyTxType = iota
 	AccessListTxType
 	DynamicFeeTxType
+	EncryptedTxType
 )
 
 // Transaction is an Ethereum transaction.
@@ -590,21 +591,40 @@ type Message struct {
 	data       []byte
 	accessList AccessList
 	isFake     bool
+	txType	   byte
 }
 
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool) Message {
-	return Message{
-		from:       from,
-		to:         to,
-		nonce:      nonce,
-		amount:     amount,
-		gasLimit:   gasLimit,
-		gasPrice:   gasPrice,
-		gasFeeCap:  gasFeeCap,
-		gasTipCap:  gasTipCap,
-		data:       data,
-		accessList: accessList,
-		isFake:     isFake,
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool, txTypes ...byte) Message {
+	if len(txTypes) == 1 {
+		return Message{
+			from:       from,
+			to:         to,
+			nonce:      nonce,
+			amount:     amount,
+			gasLimit:   gasLimit,
+			gasPrice:   gasPrice,
+			gasFeeCap:  gasFeeCap,
+			gasTipCap:  gasTipCap,
+			data:       data,
+			accessList: accessList,
+			isFake:     isFake,
+			txType:     txTypes[1],
+		}
+	} else {
+		return Message{
+			from:       from,
+			to:         to,
+			nonce:      nonce,
+			amount:     amount,
+			gasLimit:   gasLimit,
+			gasPrice:   gasPrice,
+			gasFeeCap:  gasFeeCap,
+			gasTipCap:  gasTipCap,
+			data:       data,
+			accessList: accessList,
+			isFake:     isFake,
+			txType: 	DynamicFeeTxType,
+		}
 	}
 }
 
@@ -621,6 +641,7 @@ func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
 		data:       tx.Data(),
 		accessList: tx.AccessList(),
 		isFake:     false,
+		txType:		tx.Type(),
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
@@ -642,6 +663,9 @@ func (m Message) Nonce() uint64          { return m.nonce }
 func (m Message) Data() []byte           { return m.data }
 func (m Message) AccessList() AccessList { return m.accessList }
 func (m Message) IsFake() bool           { return m.isFake }
+func (m Message) UpdateData(new []byte)  { m.data = new}
+func (m Message) UpdateTo(new *common.Address)  { m.to = new}
+func (m Message) Type()	byte			 { return m.txType }
 
 // copyAddressPtr copies an address.
 func copyAddressPtr(a *common.Address) *common.Address {
