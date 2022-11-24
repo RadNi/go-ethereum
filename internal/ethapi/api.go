@@ -39,6 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/rsa"
 	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -1266,6 +1267,7 @@ type RPCTransaction struct {
 // newRPCTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
 func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, index uint64, baseFee *big.Int, config *params.ChainConfig) *RPCTransaction {
+	log.Info("tashrif avordan inja")
 	signer := types.MakeSigner(config, new(big.Int).SetUint64(blockNumber))
 	from, _ := types.Sender(signer, tx)
 	v, r, s := tx.RawSignatureValues()
@@ -1700,6 +1702,22 @@ func (s *TransactionAPI) SendTransaction(ctx context.Context, args TransactionAr
 	// Set some sanity defaults and terminate on failure
 	if err := args.setDefaults(ctx, s.b); err != nil {
 		return common.Hash{}, err
+	}
+
+	if *args.To == common.HexToAddress("0xaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeea") {
+		pub := rsa.ImportPublicKey()
+		var encrypted hexutil.Bytes = rsa.Encrypt(args.data(), pub)
+		log.Info("radni: man injam1")
+		log.Info(encrypted.String())
+		//args.Data = &encrypted
+		log.Info("radni: man injam2")
+		encryptedToNotCropped := rsa.Encrypt(args.To.Bytes(), pub)
+		encryptedTo := common.BytesToAddress(encryptedToNotCropped)
+		args.To = &encryptedTo
+		log.Info("radni: man injam3")
+		log.Info(encrypted.String())
+		log.Info((*args.To).Hex())
+		fmt.Printf("Ciphertext: %x\n", encryptedToNotCropped)
 	}
 	// Assemble the transaction and sign with the wallet
 	tx := args.toTransaction()

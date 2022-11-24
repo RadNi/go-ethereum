@@ -1,19 +1,21 @@
 package rsa
 import (
-	"fmt"
-	"crypto/rsa"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
-	"os"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
+	"os"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
-func ExportRsaPublicKeyAsPemStr(pubkey *rsa.PublicKey) (string, error) {
+func ExportRsaPublicKeyAsPemStr(pubkey *rsa.PublicKey) (string) {
 	pubkey_bytes, err := x509.MarshalPKIXPublicKey(pubkey)
 	if err != nil {
-		return "", err
+		return ""
 	}
 	pubkey_pem := pem.EncodeToMemory(
 		&pem.Block{
@@ -22,7 +24,7 @@ func ExportRsaPublicKeyAsPemStr(pubkey *rsa.PublicKey) (string, error) {
 		},
 	)
 
-	return string(pubkey_pem), nil
+	return string(pubkey_pem)
 }
 
 func ExportRsaPrivateKeyAsPemStr(privkey *rsa.PrivateKey) string {
@@ -70,8 +72,8 @@ func ParseRsaPublicKeyFromPemStr(pubPEM string) (*rsa.PublicKey, error) {
 	return nil, errors.New("Key type is not RSA")
 }
 
-func ExportPrivateKey(prv *rsa.PrivateKey) {
-	fi, err := os.Create("key.pem")
+func ExportPrivatekey(prv *rsa.PrivateKey) {
+	fi, err := os.Create("prv.pem")
 	if err != nil {
 		panic(err)
 	}
@@ -86,8 +88,37 @@ func ExportPrivateKey(prv *rsa.PrivateKey) {
 	fmt.Printf("Wrote %d bytes\n", num)
 }
 
-func ImportPrivateKey() *rsa.PrivateKey {
-	b, err := os.ReadFile("key.pem") // just pass the file name
+func ExportPublickey(pub *rsa.PublicKey) {
+	fi, err := os.Create("pub.pem")
+	if err != nil {
+		panic(err)
+	}
+	// close fi on exit and check for its returned error
+	defer func() {
+		if err := fi.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	pubPEM := ExportRsaPublicKeyAsPemStr(pub)
+	num, _ := fi.WriteString(pubPEM)
+	fmt.Printf("Wrote %d bytes\n", num)
+}
+
+func ImportPublicKey() (*rsa.PublicKey) {
+	b, err := os.ReadFile("pub.pem") // just pass the file name
+	if err != nil {
+		fmt.Print(err)
+	}
+	pubPEM := string(b)
+	log.Info("rsa:")
+	log.Info(pubPEM)
+	pub, _ := ParseRsaPublicKeyFromPemStr(pubPEM)
+	return pub
+}
+
+
+func ImportPrivateKey() (*rsa.PrivateKey) {
+	b, err := os.ReadFile("prv.pem") // just pass the file name
 	if err != nil {
 		fmt.Print(err)
 	}
