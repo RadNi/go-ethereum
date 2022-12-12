@@ -203,7 +203,7 @@ func (st *StateTransition) to() common.Address {
 	return *st.msg.To()
 }
 
-func (st *StateTransition) buyGas() error {
+func (st *StateTransition) checkGas() error {
 	mgval := new(big.Int).SetUint64(st.msg.Gas())
 	mgval = mgval.Mul(mgval, st.gasPrice)
 	balanceCheck := mgval
@@ -215,14 +215,24 @@ func (st *StateTransition) buyGas() error {
 	if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
 		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, want)
 	}
-	if err := st.gp.SubGas(st.msg.Gas()); err != nil {
-		return err
+
+	if uint64(*st.gp) < st.msg.Gas() {
+		return ErrGasLimitReached
 	}
+	//if err := st.gp.SubGas(st.msg.Gas()); err != nil {
+	//	return err
+	//}
+	//st.gp.AddGas(st.msg.Gas())
+	return nil
+}
+
+func (st *StateTransition) buyGas() {
+	mgval := new(big.Int).SetUint64(st.msg.Gas())
+	mgval = mgval.Mul(mgval, st.gasPrice)
 	st.gas += st.msg.Gas()
 
 	st.initialGas = st.msg.Gas()
 	st.state.SubBalance(st.msg.From(), mgval)
-	return nil
 }
 
 func (st *StateTransition) preCheck() error {
@@ -270,7 +280,7 @@ func (st *StateTransition) preCheck() error {
 			}
 		}
 	}
-	return st.buyGas()
+	return st.checkGas()
 }
 
 // TransitionDb will transition the state by applying the current message and
@@ -310,7 +320,7 @@ func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
 	fmt.Println(hex.EncodeToString(st.msg.Data()))
 	//log.Info(st.msg.Data())
 	//log.Info(st.msg.Value())
-	if mode==Encrypted {
+	if mode == Delayed {
 		log.Info("dare az koja miad?1")
 		prv := rsa.ImportPrivateKey()
 		decryptedData, e := rsa.DecryptMulti(st.data, prv)
@@ -329,8 +339,23 @@ func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
 		log.Info("dare az koja miad?2")
 	}
 
-	if err := st.preCheck(); err != nil {
-		return nil, err
+	switch mode {
+	case Normal:
+		log.Info("gas game")
+		log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
+		if err := st.preCheck(); err != nil {
+			return nil, err
+		}
+		log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
+		st.buyGas()
+		log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
+		log.Info("gas game ended")
+	case Encrypted:
+		if err := st.preCheck(); err != nil {
+			return nil, err
+		}
+	case Delayed:
+		st.buyGas()
 	}
 
 	if st.evm.Config.Debug {
@@ -348,7 +373,16 @@ func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
 	)
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
-	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, rules.IsHomestead, rules.IsIstanbul)
+	var gas uint64 = 0
+	var err error
+	switch mode {
+	case Normal:
+		gas, err = IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, rules.IsHomestead, rules.IsIstanbul)
+	case Encrypted:
+		gas, err = 21000, nil
+	case Delayed:
+		//	Nothing
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -370,12 +404,25 @@ func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
 		ret   []byte
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
 	)
-	if contractCreation {
-		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
-	} else {
-		// Increment the nonce for the next transaction
+	switch mode {
+	case Normal:
+		if contractCreation {
+			ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
+		} else {
+			// Increment the nonce for the next transaction
+			st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+			ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+		}
+	case Encrypted:
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+	case Delayed:
+		if contractCreation {
+			ret, _, st.gas, vmerr = st.evm.CreateDelayed(sender, st.data, st.gas, st.value, msg.Nonce())
+		} else {
+			// Increment the nonce for the next transaction
+			//st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+			ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+		}
 	}
 
 	if !rules.IsLondon {
