@@ -21,6 +21,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
@@ -92,6 +93,7 @@ func (p *Peer) broadcastTransactions() {
 			if len(txs) > 0 {
 				done = make(chan struct{})
 				go func() {
+					log.Info("residimo residim")
 					if err := p.SendTransactions(txs); err != nil {
 						fail <- err
 						return

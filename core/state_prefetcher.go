@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -89,6 +90,7 @@ func precacheTransaction(msg types.Message, config *params.ChainConfig, gaspool 
 	// Update the evm with the new transaction context.
 	evm.Reset(NewEVMTxContext(msg), statedb)
 	// Add addresses to access list if applicable
-	_, err := ApplyMessage(evm, msg, gaspool)
+	log.Info("in chetor?")
+	_, err := ApplyMessage(evm, msg, gaspool, Normal)
 	return err
 }

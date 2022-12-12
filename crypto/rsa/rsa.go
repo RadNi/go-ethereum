@@ -127,16 +127,20 @@ func ImportPrivateKey() (*rsa.PrivateKey) {
 	return prv
 }
 
-func KeyGen() *rsa.PrivateKey {
+func KeyGen() (*rsa.PrivateKey, error) {
 	// crypto/rand.Reader is a good source of entropy for randomizing the
 	// encryption function.
 	rng := rand.Reader
-	prv, _ := rsa.GenerateKey(rng, 2048)
+	prv, err := rsa.GenerateKey(rng, 2048)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error from keygen: %s\n", err)
+		return nil, err
+	}
 	fmt.Printf("PrivateKey: %v\nPublicKey: %v\nPrimes: %v\n Precomputed.Dp: %v\n Precomputed.Dq: %v\n Precomputed.Qinv: %v\n", prv.D, prv.PublicKey, prv.Primes, &prv.Precomputed.Dp, &prv.Precomputed.Dq, &prv.Precomputed.Qinv)
-	return prv
+	return prv, nil
 }
 
-func Encrypt(message []byte, pk *rsa.PublicKey) []byte{
+func Encrypt(message []byte, pk *rsa.PublicKey) ([]byte, error){
 	label := []byte("orders")
 
 	// crypto/rand.Reader is a good source of entropy for randomizing the
@@ -146,27 +150,70 @@ func Encrypt(message []byte, pk *rsa.PublicKey) []byte{
 	ciphertext, err := rsa.EncryptOAEP(sha256.New(), rng, pk, message, label)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error from encryption: %s\n", err)
-		return nil
+		return nil, err
 	}
 
 	// Since encryption is a randomized function, ciphertext will be
 	// different each time.
 	fmt.Printf("Ciphertext: %x\n", ciphertext)
-	return ciphertext
+	return ciphertext, nil
 }
 
 
-func Decrypt(ciphertext []byte, sk *rsa.PrivateKey) []byte {
+func Decrypt(ciphertext []byte, sk *rsa.PrivateKey) ([]byte, error) {
 	rng := rand.Reader
 	label := []byte("orders")
 	plaintext, err := rsa.DecryptOAEP(sha256.New(), rng, sk, ciphertext, label)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error from decryption: %s\n", err)
-		return nil
+		return nil, err
 	}
-	return plaintext
+	return plaintext, nil
 }
 
+func EncryptMulti(msg []byte, pk *rsa.PublicKey) ([]byte, error) {
+	msgLen := len(msg)
+	step := pk.Size() - 2*sha256.New().Size() - 2
+	var encryptedBytes []byte
+
+	for start := 0; start < msgLen; start += step {
+		finish := start + step
+		if finish > msgLen {
+			finish = msgLen
+		}
+
+		encryptedBlockBytes, err := Encrypt(msg[start:finish], pk)
+		if err != nil {
+			return nil, err
+		}
+
+		encryptedBytes = append(encryptedBytes, encryptedBlockBytes...)
+	}
+
+	return encryptedBytes, nil
+}
+
+func DecryptMulti(ciphertext []byte, sk *rsa.PrivateKey) ([]byte, error) {
+	msgLen := len(ciphertext)
+	step := sk.PublicKey.Size()
+	var decryptedBytes []byte
+
+	for start := 0; start < msgLen; start += step {
+		finish := start + step
+		if finish > msgLen {
+			finish = msgLen
+		}
+
+		decryptedBlockBytes, err := Decrypt(ciphertext[start:finish], sk)
+		if err != nil {
+			return nil, err
+		}
+
+		decryptedBytes = append(decryptedBytes, decryptedBlockBytes...)
+	}
+
+	return decryptedBytes, nil
+}
 
 //func main() {
 //	message := []byte("send reinforcements, we're going to advance")

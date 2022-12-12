@@ -597,6 +597,7 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call ethereum.CallMs
 // callContract implements common code between normal and pending contract calls.
 // state is modified during execution, make sure to copy it if necessary.
 func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallMsg, block *types.Block, stateDB *state.StateDB) (*core.ExecutionResult, error) {
+	log.Info("chi dari migi?")
 	// Gas prices post 1559 need to be initialized
 	if call.GasPrice != nil && (call.GasFeeCap != nil || call.GasTipCap != nil) {
 		return nil, errors.New("both gasPrice and (maxFeePerGas or maxPriorityFeePerGas) specified")
@@ -648,7 +649,9 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 	vmEnv := vm.NewEVM(evmContext, txContext, stateDB, b.config, vm.Config{NoBaseFee: true})
 	gasPool := new(core.GasPool).AddGas(math.MaxUint64)
 
-	return core.NewStateTransition(vmEnv, msg, gasPool).TransitionDb()
+	log.Info("hala Behind you, Behind you !!!")
+
+	return core.NewStateTransition(vmEnv, msg, gasPool).TransitionDb(core.Normal)
 }
 
 // SendTransaction updates the pending block to include the given transaction.

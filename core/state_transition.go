@@ -17,9 +17,11 @@
 package core
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	cmath "github.com/ethereum/go-ethereum/common/math"
@@ -27,10 +29,17 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/rsa"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
 var emptyCodeHash = crypto.Keccak256Hash(nil)
+
+const (
+	Normal = iota
+	Encrypted
+	Delayed
+)
 
 /*
 The State Transitioning Model
@@ -182,8 +191,8 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (*ExecutionResult, error) {
-	return NewStateTransition(evm, msg, gp).TransitionDb()
+func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool, mode byte) (*ExecutionResult, error) {
+	return NewStateTransition(evm, msg, gp).TransitionDb(mode)
 }
 
 // to returns the recipient of the message.
@@ -277,7 +286,7 @@ func (st *StateTransition) preCheck() error {
 //
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
-func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
+func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
@@ -291,16 +300,33 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	// Check clauses 1-3, buy gas if everything is correct
 
-	if st.msg.Type() == types.EncryptedTxType {
+	//if st.msg.Type() == types.EncryptedTxType {
+	log.Info("inja hastam")
+	log.Info(string(mode))
+	log.Info("radni: badesh")
+	log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
+	log.Info(st.msg.From().Hex())
+	//log.Info(st.msg.To().Hex())
+	fmt.Println(hex.EncodeToString(st.msg.Data()))
+	//log.Info(st.msg.Data())
+	//log.Info(st.msg.Value())
+	if mode==Encrypted {
+		log.Info("dare az koja miad?1")
 		prv := rsa.ImportPrivateKey()
-		decryptedData := rsa.Decrypt(st.data, prv)
-		decryptedTo := common.BytesToAddress(rsa.Decrypt((*st.msg.To()).Bytes(), prv))
+		decryptedData, e := rsa.DecryptMulti(st.data, prv)
+		if e != nil {
+			return nil, e
+		}
+		//decryptedTo := common.BytesToAddress(rsa.Decrypt((*st.msg.To()).Bytes(), prv))
 		st.data = decryptedData
 		st.msg.UpdateData(decryptedData)
 
-		st.msg.UpdateTo(&decryptedTo)
+		//st.msg.UpdateTo(&decryptedTo)
 		//st.msg.data = decryptedData
 		//st.msg.to = decryptedTo
+		//}
+	} else {
+		log.Info("dare az koja miad?2")
 	}
 
 	if err := st.preCheck(); err != nil {
@@ -373,6 +399,11 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		fee.Mul(fee, effectiveTip)
 		st.state.AddBalance(st.evm.Context.Coinbase, fee)
 	}
+
+	//log.Info("radni: ExecutionResult")
+	//log.Info(string(st.gasUsed()))
+	//fmt.Println(vmerr)
+	//log.Info(string(ret))
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),

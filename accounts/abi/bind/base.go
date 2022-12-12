@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
+	//"github.com/ethereum/go-ethereum/log"
 )
 
 // SignerFn is a signer function callback when a contract requires a method to
@@ -364,6 +365,7 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 	if opts.GasPrice != nil && (opts.GasFeeCap != nil || opts.GasTipCap != nil) {
 		return nil, errors.New("both gasPrice and (maxFeePerGas or maxPriorityFeePerGas) specified")
 	}
+	fmt.Println("Behind you, Behind you !!")
 	// Create the transaction
 	var (
 		rawTx *types.Transaction
@@ -382,6 +384,7 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 			rawTx, err = c.createLegacyTx(opts, contract, input)
 		}
 	}
+	fmt.Println("Yohahaaa")
 	if err != nil {
 		return nil, err
 	}
@@ -393,9 +396,11 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("Yohahaaa2")
 	if opts.NoSend {
 		return signedTx, nil
 	}
+	fmt.Println("Yohahaaa3")
 	if err := c.transactor.SendTransaction(ensureContext(opts.Context), signedTx); err != nil {
 		return nil, err
 	}

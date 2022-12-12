@@ -23,6 +23,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
@@ -177,8 +178,12 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.precompile(addr)
 
+	log.Info("radni: call")
+
 	if !evm.StateDB.Exist(addr) {
+		log.Info("radni: address not exist")
 		if !isPrecompile && evm.chainRules.IsEIP158 && value.Sign() == 0 {
+			log.Info("radni: into")
 			// Calling a non existing account, don't do anything, but ping the tracer
 			if evm.Config.Debug {
 				if evm.depth == 0 {
@@ -212,12 +217,14 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 
 	if isPrecompile {
+		log.Info("radni: it's precompiled")
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
 		code := evm.StateDB.GetCode(addr)
 		if len(code) == 0 {
+			log.Info("radni: len is 0")
 			ret, err = nil, nil // gas is unchanged
 		} else {
 			addrCopy := addr
@@ -403,6 +410,99 @@ func (c *codeAndHash) Hash() common.Hash {
 }
 
 // create creates a new contract using code as deployment code.
+func (evm *EVM) createDelayed(caller ContractRef, codeAndHash *codeAndHash, gas uint64, value *big.Int, address common.Address, typ OpCode) ([]byte, common.Address, uint64, error) {
+	// Depth check execution. Fail if we're trying to execute above the
+	// limit.
+	if evm.depth > int(params.CallCreateDepth) {
+		return nil, common.Address{}, gas, ErrDepth
+	}
+	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
+		return nil, common.Address{}, gas, ErrInsufficientBalance
+	}
+	//nonce := evm.StateDB.GetNonce(caller.Address())
+	//if nonce+1 < nonce {
+	//	return nil, common.Address{}, gas, ErrNonceUintOverflow
+	//}
+	//evm.StateDB.SetNonce(caller.Address(), nonce+1)
+	// We add this to the access list _before_ taking a snapshot. Even if the creation fails,
+	// the access-list change should not be rolled back
+	if evm.chainRules.IsBerlin {
+		evm.StateDB.AddAddressToAccessList(address)
+	}
+	// Ensure there's no existing contract already at the designated address
+	contractHash := evm.StateDB.GetCodeHash(address)
+	if evm.StateDB.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
+		return nil, common.Address{}, 0, ErrContractAddressCollision
+	}
+	// Create a new account on the state
+	snapshot := evm.StateDB.Snapshot()
+	evm.StateDB.CreateAccount(address)
+	if evm.chainRules.IsEIP158 {
+		evm.StateDB.SetNonce(address, 1)
+	}
+	evm.Context.Transfer(evm.StateDB, caller.Address(), address, value)
+
+	// Initialise a new contract and set the code that is to be used by the EVM.
+	// The contract is a scoped environment for this execution context only.
+	contract := NewContract(caller, AccountRef(address), value, gas)
+	contract.SetCodeOptionalHash(&address, codeAndHash)
+
+	if evm.Config.Debug {
+		if evm.depth == 0 {
+			evm.Config.Tracer.CaptureStart(evm, caller.Address(), address, true, codeAndHash.code, gas, value)
+		} else {
+			evm.Config.Tracer.CaptureEnter(typ, caller.Address(), address, codeAndHash.code, gas, value)
+		}
+	}
+
+	start := time.Now()
+
+	ret, err := evm.interpreter.Run(contract, nil, false)
+
+	// Check whether the max code size has been exceeded, assign err if the case.
+	if err == nil && evm.chainRules.IsEIP158 && len(ret) > params.MaxCodeSize {
+		err = ErrMaxCodeSizeExceeded
+	}
+
+	// Reject code starting with 0xEF if EIP-3541 is enabled.
+	if err == nil && len(ret) >= 1 && ret[0] == 0xEF && evm.chainRules.IsLondon {
+		err = ErrInvalidCode
+	}
+
+	// if the contract creation ran successfully and no errors were returned
+	// calculate the gas required to store the code. If the code could not
+	// be stored due to not enough gas set an error and let it be handled
+	// by the error checking condition below.
+	if err == nil {
+		createDataGas := uint64(len(ret)) * params.CreateDataGas
+		if contract.UseGas(createDataGas) {
+			evm.StateDB.SetCode(address, ret)
+		} else {
+			err = ErrCodeStoreOutOfGas
+		}
+	}
+
+	// When an error was returned by the EVM or when setting the creation code
+	// above we revert to the snapshot and consume any gas remaining. Additionally
+	// when we're in homestead this also counts for code storage gas errors.
+	if err != nil && (evm.chainRules.IsHomestead || err != ErrCodeStoreOutOfGas) {
+		evm.StateDB.RevertToSnapshot(snapshot)
+		if err != ErrExecutionReverted {
+			contract.UseGas(contract.Gas)
+		}
+	}
+
+	if evm.Config.Debug {
+		if evm.depth == 0 {
+			evm.Config.Tracer.CaptureEnd(ret, gas-contract.Gas, time.Since(start), err)
+		} else {
+			evm.Config.Tracer.CaptureExit(ret, gas-contract.Gas, err)
+		}
+	}
+	return ret, address, contract.Gas, err
+}
+
+// create creates a new contract using code as deployment code.
 func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64, value *big.Int, address common.Address, typ OpCode) ([]byte, common.Address, uint64, error) {
 	// Depth check execution. Fail if we're trying to execute above the
 	// limit.
@@ -499,6 +599,12 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
 	contractAddr = crypto.CreateAddress(caller.Address(), evm.StateDB.GetNonce(caller.Address()))
 	return evm.create(caller, &codeAndHash{code: code}, gas, value, contractAddr, CREATE)
+}
+
+// Create creates a new contract using code as deployment code.
+func (evm *EVM) CreateDelayed(caller ContractRef, code []byte, gas uint64, value *big.Int, nonce uint64) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
+	contractAddr = crypto.CreateAddress(caller.Address(), nonce)
+	return evm.createDelayed(caller, &codeAndHash{code: code}, gas, value, contractAddr, CREATE)
 }
 
 // Create2 creates a new contract using code as deployment code.

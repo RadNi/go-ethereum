@@ -290,6 +290,7 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 			return valid(nil), beacon.InvalidPayloadAttributes.With(err)
 		}
 		id := computePayloadId(update.HeadBlockHash, payloadAttributes)
+		log.Info("radni: api.localBlocks.put, inja bayad block ro shoro kone por kardan")
 		api.localBlocks.put(id, &payload{empty: empty, result: resCh})
 		return valid(&id), nil
 	}
@@ -329,6 +330,8 @@ func (api *ConsensusAPI) ExchangeTransitionConfigurationV1(config beacon.Transit
 // GetPayloadV1 returns a cached payload by id.
 func (api *ConsensusAPI) GetPayloadV1(payloadID beacon.PayloadID) (*beacon.ExecutableDataV1, error) {
 	log.Trace("Engine API request received", "method", "GetPayload", "id", payloadID)
+	log.Info("radni:")
+	log.Info(payloadID.String())
 	data := api.localBlocks.get(payloadID)
 	if data == nil {
 		return nil, beacon.UnknownPayload
@@ -433,6 +436,9 @@ func computePayloadId(headBlockHash common.Hash, params *beacon.PayloadAttribute
 	hasher.Write(params.SuggestedFeeRecipient[:])
 	var out beacon.PayloadID
 	copy(out[:], hasher.Sum(nil)[:8])
+	log.Info("radni: computePayloadId")
+	log.Info(headBlockHash.Hex())
+	log.Info(out.String())
 	return out
 }
 

@@ -962,7 +962,8 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 
 	// Execute the message.
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
-	result, err := core.ApplyMessage(evm, msg, gp)
+	log.Info("diriid")
+	result, err := core.ApplyMessage(evm, msg, gp, core.Normal)
 	if err := vmError(); err != nil {
 		return nil, err
 	}
@@ -1440,7 +1441,8 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 		if err != nil {
 			return nil, 0, nil, err
 		}
-		res, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
+		log.Info("dirid dadad")
+		res, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), core.Encrypted)
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("failed to apply transaction: %v err: %v", args.toTransaction().Hash(), err)
 		}
@@ -1704,21 +1706,26 @@ func (s *TransactionAPI) SendTransaction(ctx context.Context, args TransactionAr
 		return common.Hash{}, err
 	}
 
-	if *args.To == common.HexToAddress("0xaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeea") {
+	//if *args.To == common.HexToAddress("0xaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeea") {
 		pub := rsa.ImportPublicKey()
-		var encrypted hexutil.Bytes = rsa.Encrypt(args.data(), pub)
+		var encrypted hexutil.Bytes
+		var e error
+		encrypted, e = rsa.EncryptMulti(args.data(), pub)
+		if e != nil {
+			return common.Hash{}, e
+		}
 		log.Info("radni: man injam1")
 		log.Info(encrypted.String())
-		//args.Data = &encrypted
+		args.Data = &encrypted
 		log.Info("radni: man injam2")
-		encryptedToNotCropped := rsa.Encrypt(args.To.Bytes(), pub)
-		encryptedTo := common.BytesToAddress(encryptedToNotCropped)
-		args.To = &encryptedTo
+		//encryptedToNotCropped := rsa.Encrypt(args.To.Bytes(), pub)
+		//encryptedTo := common.BytesToAddress(encryptedToNotCropped)
+		//args.To = &encryptedTo
 		log.Info("radni: man injam3")
 		log.Info(encrypted.String())
-		log.Info((*args.To).Hex())
-		fmt.Printf("Ciphertext: %x\n", encryptedToNotCropped)
-	}
+		//log.Info((*args.To).Hex())
+		//fmt.Printf("Ciphertext: %x\n", encryptedToNotCropped)
+	//}
 	// Assemble the transaction and sign with the wallet
 	tx := args.toTransaction()
 

@@ -822,10 +822,12 @@ func (w *worker) updateSnapshot(env *environment) {
 	w.snapshotState = env.state.Copy()
 }
 
-func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*types.Log, error) {
+func (w *worker) commitTransaction(env *environment, tx *types.Transaction, mode byte) ([]*types.Log, error) {
 	snap := env.state.Snapshot()
 
-	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig())
+	log.Info("radni: inja transaction ro regularly add mikone be block ba tavajoh be parametr haii ke az beacon-chain miad")
+
+	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig(), mode)
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		return nil, err
@@ -835,6 +837,93 @@ func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*
 
 	return receipt.Logs, nil
 }
+
+func (w *worker) commitDelayedTransactions(env *environment, txs types.Transactions, interrupt *int32) error {
+	gasLimit := env.header.GasLimit
+	if env.gasPool == nil {
+		env.gasPool = new(core.GasPool).AddGas(gasLimit)
+	}
+	var coalescedLogs []*types.Log
+
+	for {
+		// In the following three cases, we will interrupt the execution of the transaction.
+		// (1) new head block event arrival, the interrupt signal is 1
+		// (2) worker start or restart, the interrupt signal is 1
+		// (3) worker recreate the sealing block with any newly arrived transactions, the interrupt signal is 2.
+		// For the first two cases, the semi-finished work will be discarded.
+		// For the third case, the semi-finished work will be submitted to the consensus engine.
+		if interrupt != nil && atomic.LoadInt32(interrupt) != commitInterruptNone {
+			// Notify resubmit loop to increase resubmitting interval due to too frequent commits.
+			if atomic.LoadInt32(interrupt) == commitInterruptResubmit {
+				ratio := float64(gasLimit-env.gasPool.Gas()) / float64(gasLimit)
+				if ratio < 0.1 {
+					ratio = 0.1
+				}
+				w.resubmitAdjustCh <- &intervalAdjust{
+					ratio: ratio,
+					inc:   true,
+				}
+				return errBlockInterruptedByRecommit
+			}
+			return errBlockInterruptedByNewHead
+		}
+		// If we don't have enough gas for any further transactions then we're done
+		if env.gasPool.Gas() < params.TxGas {
+			log.Trace("Not enough gas for further transactions", "have", env.gasPool, "want", params.TxGas)
+			break
+		}
+		// Retrieve the next transaction and abort if all done
+		if len(txs) == 0 {
+			break
+		}
+		tx := txs[0]
+		// Error may be ignored here. The error has already been checked
+		// during transaction acceptance is the transaction pool.
+		//
+		// We use the eip155 signer regardless of the current hf.
+		from, _ := types.Sender(env.signer, tx)
+
+		// Start executing the transaction
+		env.state.Prepare(tx.Hash(), env.tcount)
+
+		logs, err := w.commitTransaction(env, tx, core.Delayed)
+		switch {
+		case errors.Is(err, core.ErrGasLimitReached):
+			// Pop the current out-of-gas transaction without shifting in the next from the account
+			log.Trace("Gas limit exceeded for current block", "sender", from)
+			txs = txs[1:]
+
+		case errors.Is(err, nil):
+			// Everything ok, collect the logs and shift in the next transaction from the same account
+			coalescedLogs = append(coalescedLogs, logs...)
+			env.tcount++
+			txs = txs[1:]
+		}
+	}
+
+	if !w.isRunning() && len(coalescedLogs) > 0 {
+		// We don't push the pendingLogsEvent while we are sealing. The reason is that
+		// when we are sealing, the worker will regenerate a sealing block every 3 seconds.
+		// In order to avoid pushing the repeated pendingLog, we disable the pending log pushing.
+
+		// make a copy, the state caches the logs and these logs get "upgraded" from pending to mined
+		// logs by filling in the block hash when the block was mined by the local miner. This can
+		// cause a race condition if a log was "upgraded" before the PendingLogsEvent is processed.
+		cpy := make([]*types.Log, len(coalescedLogs))
+		for i, l := range coalescedLogs {
+			cpy[i] = new(types.Log)
+			*cpy[i] = *l
+		}
+		w.pendingLogsFeed.Send(cpy)
+	}
+	// Notify resubmit loop to decrease resubmitting interval if current interval is larger
+	// than the user-specified one.
+	if interrupt != nil {
+		w.resubmitAdjustCh <- &intervalAdjust{inc: false}
+	}
+	return nil
+}
+
 
 func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByPriceAndNonce, interrupt *int32) error {
 	gasLimit := env.header.GasLimit
@@ -891,7 +980,13 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 		// Start executing the transaction
 		env.state.Prepare(tx.Hash(), env.tcount)
 
-		logs, err := w.commitTransaction(env, tx)
+		var mode byte
+		if currentLen := w.chain.CurrentBlock().NumberU64(); currentLen >= 10 {
+			mode = core.Encrypted
+		} else {
+			mode = core.Normal
+		}
+		logs, err := w.commitTransaction(env, tx, mode)
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -909,6 +1004,7 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 			txs.Pop()
 
 		case errors.Is(err, nil):
+			log.Info("that was no error")
 			// Everything ok, collect the logs and shift in the next transaction from the same account
 			coalescedLogs = append(coalescedLogs, logs...)
 			env.tcount++
@@ -1082,6 +1178,24 @@ func (w *worker) generateWork(params *generateParams) (*types.Block, error) {
 	defer work.discard()
 
 	if !params.noTxs {
+		if currentLen := w.chain.CurrentBlock().NumberU64(); currentLen >= 10 {
+			//var delay uint64 = 2
+			// Activate encryption
+			//b := w.chain.GetBlockByNumber(currentLen - delay)
+			//txsMap := make(map[common.Address]types.Transactions)
+			//for _, tx := range b.Transactions() {
+				//txs, ok := txsMap[tx.From()]
+				//if ok {
+				//	txsMap[tx.From()] = append(txs, tx)
+				//} else {
+				//	txsMap[tx.From()] = [1]Transaction{tx}
+				//}
+			//}
+			//txs := types.NewTransactionsByPriceAndNonce(work.signer, b.Transactions(), env.header.BaseFee)
+			//if err := w.commitDelayedTransactions(work, b.Transactions(), nil); err != nil {
+			//	return nil, err
+			//}
+		}
 		w.fillTransactions(nil, work)
 	}
 	return w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, work.txs, work.unclelist(), work.receipts)
