@@ -24,6 +24,7 @@ import (
 
 // LegacyTx is the transaction data of regular Ethereum transactions.
 type LegacyTx struct {
+	Mode     byte
 	Nonce    uint64          // nonce of sender account
 	GasPrice *big.Int        // wei per gas
 	Gas      uint64          // gas limit
@@ -35,8 +36,9 @@ type LegacyTx struct {
 
 // NewTransaction creates an unsigned legacy transaction.
 // Deprecated: use NewTx instead.
-func NewTransaction(nonce uint64, to common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
+func NewTransaction(nonce uint64, to common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, mode byte) *Transaction {
 	return NewTx(&LegacyTx{
+		Mode: 	  mode,
 		Nonce:    nonce,
 		To:       &to,
 		Value:    amount,
@@ -48,8 +50,9 @@ func NewTransaction(nonce uint64, to common.Address, amount *big.Int, gasLimit u
 
 // NewContractCreation creates an unsigned legacy transaction.
 // Deprecated: use NewTx instead.
-func NewContractCreation(nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
+func NewContractCreation(nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, mode byte) *Transaction {
 	return NewTx(&LegacyTx{
+		Mode: 	  mode,
 		Nonce:    nonce,
 		Value:    amount,
 		Gas:      gasLimit,
@@ -61,6 +64,7 @@ func NewContractCreation(nonce uint64, amount *big.Int, gasLimit uint64, gasPric
 // copy creates a deep copy of the transaction data and initializes all fields.
 func (tx *LegacyTx) copy() TxData {
 	cpy := &LegacyTx{
+		Mode:  tx.Mode,
 		Nonce: tx.Nonce,
 		To:    copyAddressPtr(tx.To),
 		Data:  common.CopyBytes(tx.Data),
@@ -91,6 +95,8 @@ func (tx *LegacyTx) copy() TxData {
 }
 
 // accessors for innerTx.
+func (tx *LegacyTx) txMode() byte           { return tx.Mode }
+func (tx *LegacyTx) setMode(mode byte)      { tx.Mode = mode }
 func (tx *LegacyTx) txType() byte           { return LegacyTxType }
 func (tx *LegacyTx) chainID() *big.Int      { return deriveChainId(tx.V) }
 func (tx *LegacyTx) accessList() AccessList { return nil }

@@ -23,6 +23,7 @@ import (
 )
 
 type DynamicFeeTx struct {
+	Mode 	   byte
 	ChainID    *big.Int
 	Nonce      uint64
 	GasTipCap  *big.Int // a.k.a. maxPriorityFeePerGas
@@ -42,6 +43,7 @@ type DynamicFeeTx struct {
 // copy creates a deep copy of the transaction data and initializes all fields.
 func (tx *DynamicFeeTx) copy() TxData {
 	cpy := &DynamicFeeTx{
+		Mode: tx.Mode,
 		Nonce: tx.Nonce,
 		To:    copyAddressPtr(tx.To),
 		Data:  common.CopyBytes(tx.Data),
@@ -82,6 +84,8 @@ func (tx *DynamicFeeTx) copy() TxData {
 }
 
 // accessors for innerTx.
+func (tx *DynamicFeeTx) txMode() byte           { return tx.Mode }
+func (tx *DynamicFeeTx) setMode(mode byte)      { tx.Mode = mode }
 func (tx *DynamicFeeTx) txType() byte           { return DynamicFeeTxType }
 func (tx *DynamicFeeTx) chainID() *big.Int      { return tx.ChainID }
 func (tx *DynamicFeeTx) accessList() AccessList { return tx.AccessList }

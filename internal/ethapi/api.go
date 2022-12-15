@@ -963,7 +963,7 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 	// Execute the message.
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
 	log.Info("diriid")
-	result, err := core.ApplyMessage(evm, msg, gp, core.Normal)
+	result, err := core.ApplyMessage(evm, msg, gp)
 	if err := vmError(); err != nil {
 		return nil, err
 	}
@@ -1442,7 +1442,7 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 			return nil, 0, nil, err
 		}
 		log.Info("dirid dadad")
-		res, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), core.Encrypted)
+		res, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("failed to apply transaction: %v err: %v", args.toTransaction().Hash(), err)
 		}
@@ -1727,6 +1727,7 @@ func (s *TransactionAPI) SendTransaction(ctx context.Context, args TransactionAr
 		//fmt.Printf("Ciphertext: %x\n", encryptedToNotCropped)
 	//}
 	// Assemble the transaction and sign with the wallet
+	args.Mode = types.Encrypted
 	tx := args.toTransaction()
 
 	signed, err := wallet.SignTx(account, tx, s.b.ChainConfig().ChainID)

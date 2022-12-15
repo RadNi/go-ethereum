@@ -161,7 +161,7 @@ func (c *BoundContract) Call(opts *CallOpts, results *[]interface{}, method stri
 		return err
 	}
 	var (
-		msg    = ethereum.CallMsg{From: opts.From, To: &c.address, Data: input}
+		msg    = ethereum.CallMsg{From: opts.From, To: &c.address, Data: input, Mode: types.Normal}
 		ctx    = ensureContext(opts.Context)
 		code   []byte
 		output []byte
@@ -340,6 +340,7 @@ func (c *BoundContract) estimateGasLimit(opts *TransactOpts, contract *common.Ad
 		}
 	}
 	msg := ethereum.CallMsg{
+		Mode:	   types.Normal,
 		From:      opts.From,
 		To:        contract,
 		GasPrice:  gasPrice,

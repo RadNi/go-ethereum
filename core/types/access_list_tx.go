@@ -44,6 +44,7 @@ func (al AccessList) StorageKeys() int {
 
 // AccessListTx is the data of EIP-2930 access list transactions.
 type AccessListTx struct {
+	Mode	   byte
 	ChainID    *big.Int        // destination chain ID
 	Nonce      uint64          // nonce of sender account
 	GasPrice   *big.Int        // wei per gas
@@ -94,6 +95,8 @@ func (tx *AccessListTx) copy() TxData {
 }
 
 // accessors for innerTx.
+func (tx *AccessListTx) txMode() byte           { return Normal }
+func (tx *AccessListTx) setMode(mode byte)      { tx.Mode = mode }
 func (tx *AccessListTx) txType() byte           { return AccessListTxType }
 func (tx *AccessListTx) chainID() *big.Int      { return tx.ChainID }
 func (tx *AccessListTx) accessList() AccessList { return tx.AccessList }

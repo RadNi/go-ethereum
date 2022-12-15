@@ -651,7 +651,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 
 	log.Info("hala Behind you, Behind you !!!")
 
-	return core.NewStateTransition(vmEnv, msg, gasPool).TransitionDb(core.Normal)
+	return core.NewStateTransition(vmEnv, msg, gasPool).TransitionDb()
 }
 
 // SendTransaction updates the pending block to include the given transaction.
@@ -815,6 +815,7 @@ type callMsg struct {
 	ethereum.CallMsg
 }
 
+func (m callMsg) Mode() byte		           { return m.CallMsg.Mode }
 func (m callMsg) From() common.Address         { return m.CallMsg.From }
 func (m callMsg) Nonce() uint64                { return 0 }
 func (m callMsg) IsFake() bool                 { return true }

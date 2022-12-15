@@ -35,11 +35,6 @@ import (
 
 var emptyCodeHash = crypto.Keccak256Hash(nil)
 
-const (
-	Normal = iota
-	Encrypted
-	Delayed
-)
 
 /*
 The State Transitioning Model
@@ -74,6 +69,7 @@ type StateTransition struct {
 
 // Message represents a message sent to a contract.
 type Message interface {
+	Mode() byte
 	From() common.Address
 	To() *common.Address
 
@@ -191,8 +187,8 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool, mode byte) (*ExecutionResult, error) {
-	return NewStateTransition(evm, msg, gp).TransitionDb(mode)
+func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (*ExecutionResult, error) {
+	return NewStateTransition(evm, msg, gp).TransitionDb()
 }
 
 // to returns the recipient of the message.
@@ -216,6 +212,10 @@ func (st *StateTransition) checkGas() error {
 		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, want)
 	}
 
+	log.Info("radni: checkGas:")
+	log.Info(strconv.Itoa(int(uint64(*st.gp))))
+	log.Info(strconv.Itoa(int(st.msg.Gas())))
+
 	if uint64(*st.gp) < st.msg.Gas() {
 		return ErrGasLimitReached
 	}
@@ -226,12 +226,12 @@ func (st *StateTransition) checkGas() error {
 	return nil
 }
 
-func (st *StateTransition) buyGas() {
-	mgval := new(big.Int).SetUint64(st.msg.Gas())
+func (st *StateTransition) buyGas(gas uint64) {
+	mgval := new(big.Int).SetUint64(gas)
 	mgval = mgval.Mul(mgval, st.gasPrice)
-	st.gas += st.msg.Gas()
-
-	st.initialGas = st.msg.Gas()
+	st.gas += gas
+	st.gp.SubGas(gas) // The error was already checked
+	st.initialGas = gas
 	st.state.SubBalance(st.msg.From(), mgval)
 }
 
@@ -296,7 +296,7 @@ func (st *StateTransition) preCheck() error {
 //
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
-func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
+func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
@@ -311,16 +311,18 @@ func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
 	// Check clauses 1-3, buy gas if everything is correct
 
 	//if st.msg.Type() == types.EncryptedTxType {
+	mode := st.msg.Mode()
 	log.Info("inja hastam")
-	log.Info(string(mode))
+	log.Info(strconv.Itoa(int(mode)))
 	log.Info("radni: badesh")
 	log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
 	log.Info(st.msg.From().Hex())
 	//log.Info(st.msg.To().Hex())
 	fmt.Println(hex.EncodeToString(st.msg.Data()))
+	var inclusionGasCost uint64 = 21000
 	//log.Info(st.msg.Data())
 	//log.Info(st.msg.Value())
-	if mode == Delayed {
+	if mode == types.Delayed {
 		log.Info("dare az koja miad?1")
 		prv := rsa.ImportPrivateKey()
 		decryptedData, e := rsa.DecryptMulti(st.data, prv)
@@ -340,22 +342,24 @@ func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
 	}
 
 	switch mode {
-	case Normal:
+	case types.Normal:
 		log.Info("gas game")
 		log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
 		if err := st.preCheck(); err != nil {
 			return nil, err
 		}
 		log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
-		st.buyGas()
+		st.buyGas(st.msg.Gas())
 		log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
 		log.Info("gas game ended")
-	case Encrypted:
+	case types.Encrypted:
 		if err := st.preCheck(); err != nil {
+			log.Info("radni: error1")
 			return nil, err
 		}
-	case Delayed:
-		st.buyGas()
+		st.buyGas(inclusionGasCost)
+	case types.Delayed:
+		st.buyGas(st.msg.Gas())
 	}
 
 	if st.evm.Config.Debug {
@@ -376,23 +380,28 @@ func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
 	var gas uint64 = 0
 	var err error
 	switch mode {
-	case Normal:
+	case types.Normal:
 		gas, err = IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, rules.IsHomestead, rules.IsIstanbul)
-	case Encrypted:
-		gas, err = 21000, nil
-	case Delayed:
-		//	Nothing
+	case types.Encrypted:
+		gas, err = inclusionGasCost, nil
+	case types.Delayed:
+		gas, err = IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, rules.IsHomestead, rules.IsIstanbul)
 	}
 	if err != nil {
+		log.Info("radni: error2")
 		return nil, err
 	}
 	if st.gas < gas {
+		log.Info("radni: error3")
+		log.Info(strconv.Itoa(int(st.gas)))
+		log.Info(strconv.Itoa(int(gas)))
 		return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gas, gas)
 	}
 	st.gas -= gas
 
 	// Check clause 6
 	if msg.Value().Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.From(), msg.Value()) {
+		log.Info("radni: error4")
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From().Hex())
 	}
 
@@ -405,7 +414,7 @@ func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
 	)
 	switch mode {
-	case Normal:
+	case types.Normal:
 		if contractCreation {
 			ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
 		} else {
@@ -413,12 +422,15 @@ func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
 			st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 			ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
 		}
-	case Encrypted:
+	case types.Encrypted:
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-	case Delayed:
+		st.evm.StateDB.SubBalance(msg.From(), st.value)
+	case types.Delayed:
+		st.evm.StateDB.AddBalance(msg.From(), st.value)
 		if contractCreation {
 			ret, _, st.gas, vmerr = st.evm.CreateDelayed(sender, st.data, st.gas, st.value, msg.Nonce())
 		} else {
+			log.Info("radni: executing delayed")
 			// Increment the nonce for the next transaction
 			//st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 			ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
@@ -447,10 +459,12 @@ func (st *StateTransition) TransitionDb(mode byte) (*ExecutionResult, error) {
 		st.state.AddBalance(st.evm.Context.Coinbase, fee)
 	}
 
-	//log.Info("radni: ExecutionResult")
+	log.Info("radni: ExecutionResult")
 	//log.Info(string(st.gasUsed()))
-	//fmt.Println(vmerr)
-	//log.Info(string(ret))
+	fmt.Println(vmerr)
+	log.Info(string(ret))
+
+	log.Info("radni: resid be tahesh?")
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),

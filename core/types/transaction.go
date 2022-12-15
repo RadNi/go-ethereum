@@ -48,6 +48,12 @@ const (
 	//EncryptedTxType
 )
 
+const (
+	Normal = iota
+	Encrypted
+	Delayed
+)
+
 // Transaction is an Ethereum transaction.
 type Transaction struct {
 	inner TxData    // Consensus contents of a transaction
@@ -70,8 +76,10 @@ func NewTx(inner TxData) *Transaction {
 //
 // This is implemented by DynamicFeeTx, LegacyTx and AccessListTx.
 type TxData interface {
+	txMode() byte // returns the mode ID
 	txType() byte // returns the type ID
 	copy() TxData // creates a deep copy and initializes all fields
+	setMode(byte)
 
 	chainID() *big.Int
 	accessList() AccessList
@@ -242,6 +250,15 @@ func (tx *Transaction) Protected() bool {
 	default:
 		return true
 	}
+}
+
+// Type returns the transaction type.
+func (tx *Transaction) Mode() byte {
+	return tx.inner.txMode()
+}
+
+func (tx *Transaction) SetMode(mode byte) {
+	tx.inner.setMode(mode)
 }
 
 // Type returns the transaction type.
@@ -580,6 +597,7 @@ func (t *TransactionsByPriceAndNonce) Pop() {
 //
 // NOTE: In a future PR this will be removed.
 type Message struct {
+	mode	   byte
 	to         *common.Address
 	from       common.Address
 	nonce      uint64
@@ -594,9 +612,10 @@ type Message struct {
 	txType	   byte
 }
 
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool, txTypes ...byte) Message {
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool, mode byte, txTypes ...byte) Message {
 	if len(txTypes) == 1 {
 		return Message{
+			mode:       mode,
 			from:       from,
 			to:         to,
 			nonce:      nonce,
@@ -612,6 +631,7 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 		}
 	} else {
 		return Message{
+			mode:       mode,
 			from:       from,
 			to:         to,
 			nonce:      nonce,
@@ -631,6 +651,7 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 // AsMessage returns the transaction as a core.Message.
 func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
 	msg := Message{
+		mode:       tx.Mode(),
 		nonce:      tx.Nonce(),
 		gasLimit:   tx.Gas(),
 		gasPrice:   new(big.Int).Set(tx.GasPrice()),
@@ -666,6 +687,7 @@ func (m Message) IsFake() bool           { return m.isFake }
 func (m Message) UpdateData(new []byte)  { m.data = new}
 func (m Message) UpdateTo(new *common.Address)  { m.to = new}
 func (m Message) Type()	byte			 { return m.txType }
+func (m Message) Mode() byte  			 { return m.mode }
 
 // copyAddressPtr copies an address.
 func copyAddressPtr(a *common.Address) *common.Address {

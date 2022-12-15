@@ -34,6 +34,7 @@ import (
 // TransactionArgs represents the arguments to construct a new transaction
 // or a message call.
 type TransactionArgs struct {
+	Mode				 byte			 `json:"mode"`
 	From                 *common.Address `json:"from"`
 	To                   *common.Address `json:"to"`
 	Gas                  *hexutil.Uint64 `json:"gas"`
@@ -78,6 +79,9 @@ func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 	if err := args.setFeeDefaults(ctx, b); err != nil {
 		return err
 	}
+	//if args.Mode == byte(nil) {
+	//	args.Mode = core.Normal
+	//}
 	if args.Value == nil {
 		args.Value = new(hexutil.Big)
 	}
@@ -100,6 +104,7 @@ func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 		// pass the pointer directly.
 		data := args.data()
 		callArgs := TransactionArgs{
+			Mode:                 args.Mode,
 			From:                 args.From,
 			To:                   args.To,
 			GasPrice:             args.GasPrice,
@@ -263,7 +268,7 @@ func (args *TransactionArgs) ToMessage(globalGasCap uint64, baseFee *big.Int) (t
 	if args.AccessList != nil {
 		accessList = *args.AccessList
 	}
-	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, gasFeeCap, gasTipCap, data, accessList, true)
+	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, gasFeeCap, gasTipCap, data, accessList, true, args.Mode)
 	return msg, nil
 }
 
@@ -278,6 +283,7 @@ func (args *TransactionArgs) toTransaction() *types.Transaction {
 			al = *args.AccessList
 		}
 		data = &types.DynamicFeeTx{
+			Mode:		args.Mode,
 			To:         args.To,
 			ChainID:    (*big.Int)(args.ChainID),
 			Nonce:      uint64(*args.Nonce),
@@ -290,6 +296,7 @@ func (args *TransactionArgs) toTransaction() *types.Transaction {
 		}
 	case args.AccessList != nil:
 		data = &types.AccessListTx{
+			Mode:		types.Normal,
 			To:         args.To,
 			ChainID:    (*big.Int)(args.ChainID),
 			Nonce:      uint64(*args.Nonce),
@@ -301,6 +308,7 @@ func (args *TransactionArgs) toTransaction() *types.Transaction {
 		}
 	default:
 		data = &types.LegacyTx{
+			Mode:	  args.Mode,
 			To:       args.To,
 			Nonce:    uint64(*args.Nonce),
 			Gas:      uint64(*args.Gas),

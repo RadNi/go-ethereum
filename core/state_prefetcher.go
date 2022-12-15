@@ -91,6 +91,6 @@ func precacheTransaction(msg types.Message, config *params.ChainConfig, gaspool 
 	evm.Reset(NewEVMTxContext(msg), statedb)
 	// Add addresses to access list if applicable
 	log.Info("in chetor?")
-	_, err := ApplyMessage(evm, msg, gaspool, Normal)
+	_, err := ApplyMessage(evm, msg, gaspool)
 	return err
 }

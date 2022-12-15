@@ -82,6 +82,7 @@ func (v *ValidationMessages) GetWarnings() error {
 // This struct is identical to ethapi.TransactionArgs, except for the usage of
 // common.MixedcaseAddress in From and To
 type SendTxArgs struct {
+	Mode				 byte					  `json:"mode"`
 	From                 common.MixedcaseAddress  `json:"from"`
 	To                   *common.MixedcaseAddress `json:"to"`
 	Gas                  hexutil.Uint64           `json:"gas"`
@@ -134,6 +135,7 @@ func (args *SendTxArgs) ToTransaction() *types.Transaction {
 			al = *args.AccessList
 		}
 		data = &types.DynamicFeeTx{
+			Mode:		args.Mode,
 			To:         to,
 			ChainID:    (*big.Int)(args.ChainID),
 			Nonce:      uint64(args.Nonce),
@@ -146,6 +148,7 @@ func (args *SendTxArgs) ToTransaction() *types.Transaction {
 		}
 	case args.AccessList != nil:
 		data = &types.AccessListTx{
+			Mode:		types.Normal,
 			To:         to,
 			ChainID:    (*big.Int)(args.ChainID),
 			Nonce:      uint64(args.Nonce),
@@ -157,6 +160,7 @@ func (args *SendTxArgs) ToTransaction() *types.Transaction {
 		}
 	default:
 		data = &types.LegacyTx{
+			Mode:	  args.Mode,
 			To:       to,
 			Nonce:    uint64(args.Nonce),
 			Gas:      uint64(args.Gas),

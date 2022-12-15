@@ -822,13 +822,14 @@ func (w *worker) updateSnapshot(env *environment) {
 	w.snapshotState = env.state.Copy()
 }
 
-func (w *worker) commitTransaction(env *environment, tx *types.Transaction, mode byte) ([]*types.Log, error) {
+func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*types.Log, error) {
 	snap := env.state.Snapshot()
 
 	log.Info("radni: inja transaction ro regularly add mikone be block ba tavajoh be parametr haii ke az beacon-chain miad")
 
-	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig(), mode)
+	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
+		log.Info("radni: error khord?1")
 		env.state.RevertToSnapshot(snap)
 		return nil, err
 	}
@@ -886,7 +887,11 @@ func (w *worker) commitDelayedTransactions(env *environment, txs types.Transacti
 		// Start executing the transaction
 		env.state.Prepare(tx.Hash(), env.tcount)
 
-		logs, err := w.commitTransaction(env, tx, core.Delayed)
+		(*tx).SetMode(types.Delayed)
+
+		log.Info("radni: Executing delayed transaction:")
+		log.Info(tx.Hash().Hex())
+		logs, err := w.commitTransaction(env, tx)
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -898,6 +903,10 @@ func (w *worker) commitDelayedTransactions(env *environment, txs types.Transacti
 			coalescedLogs = append(coalescedLogs, logs...)
 			env.tcount++
 			txs = txs[1:]
+			log.Info("radni: It was appended ...")
+		default:
+			log.Info("Transaction failed")
+			fmt.Println(err)
 		}
 	}
 
@@ -980,13 +989,12 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 		// Start executing the transaction
 		env.state.Prepare(tx.Hash(), env.tcount)
 
-		var mode byte
 		if currentLen := w.chain.CurrentBlock().NumberU64(); currentLen >= 10 {
-			mode = core.Encrypted
+			tx.SetMode(types.Encrypted)
 		} else {
-			mode = core.Normal
+			tx.SetMode(types.Normal)
 		}
-		logs, err := w.commitTransaction(env, tx, mode)
+		logs, err := w.commitTransaction(env, tx)
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -1179,22 +1187,20 @@ func (w *worker) generateWork(params *generateParams) (*types.Block, error) {
 
 	if !params.noTxs {
 		if currentLen := w.chain.CurrentBlock().NumberU64(); currentLen >= 10 {
-			//var delay uint64 = 2
+			var delay uint64 = 2
 			// Activate encryption
-			//b := w.chain.GetBlockByNumber(currentLen - delay)
-			//txsMap := make(map[common.Address]types.Transactions)
-			//for _, tx := range b.Transactions() {
-				//txs, ok := txsMap[tx.From()]
-				//if ok {
-				//	txsMap[tx.From()] = append(txs, tx)
-				//} else {
-				//	txsMap[tx.From()] = [1]Transaction{tx}
-				//}
-			//}
-			//txs := types.NewTransactionsByPriceAndNonce(work.signer, b.Transactions(), env.header.BaseFee)
-			//if err := w.commitDelayedTransactions(work, b.Transactions(), nil); err != nil {
-			//	return nil, err
-			//}
+			b := w.chain.GetBlockByNumber(currentLen - delay)
+			var txs types.Transactions
+			for _, tx := range b.Transactions() {
+				if tx.Mode() == types.Encrypted {
+					txs = append(txs, tx)
+				}
+			}
+			if err := w.commitDelayedTransactions(work, txs, nil); err != nil {
+				log.Info("intoOo")
+				fmt.Println(err)
+				return nil, err
+			}
 		}
 		w.fillTransactions(nil, work)
 	}
