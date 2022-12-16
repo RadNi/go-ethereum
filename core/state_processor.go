@@ -74,7 +74,40 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	blockContext := NewEVMBlockContext(header, p.bc, nil)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
 	// Iterate over and process the individual transactions
+	// First check the delayed transactions are added properly, and in the right order
+	var pb *types.Block
+	currentLen := p.bc.CurrentBlock().NumberU64()
+	if currentLen >= 10 {
+
+		var delay uint64 = 2
+		var orderedEncryptedTransaction types.Transactions
+		var orderedDelayedTransaction types.Transactions
+		pb = p.bc.GetBlockByNumber(currentLen - delay)
+		for _, tx := range pb.Transactions(){
+			if tx.Mode() == types.Encrypted {
+				orderedEncryptedTransaction = append(orderedEncryptedTransaction, tx)
+			}
+		}
+		for _, tx := range block.Transactions() {
+			if tx.Mode() == types.Delayed {
+				orderedDelayedTransaction = append(orderedDelayedTransaction, tx)
+			}
+		}
+		if len(orderedDelayedTransaction) != len(orderedDelayedTransaction) {
+			return nil, nil, 0, fmt.Errorf("Encrypted transactions number doesn't match delayed transactions'")
+		}
+		for i, tx := range orderedEncryptedTransaction {
+			if tx.Hash() == orderedDelayedTransaction[i].Hash(){
+				return nil, nil, 0, fmt.Errorf("encrypted tx %d [%v] hasn't been applied into current block", i, tx.Hash().Hex())
+			}
+		}
+	}
 	for i, tx := range block.Transactions() {
+		if currentLen >= 10 {
+			if tx.Mode() == types.Normal {
+				return nil, nil, 0, fmt.Errorf("after the transition, tx of Normal type is not allowed tx %d [%v]", i, tx.Hash().Hex())
+			}
+		}
 		msg, err := tx.AsMessage(types.MakeSigner(p.config, header.Number), header.BaseFee)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)

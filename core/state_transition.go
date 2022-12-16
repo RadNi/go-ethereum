@@ -431,9 +431,11 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			ret, _, st.gas, vmerr = st.evm.CreateDelayed(sender, st.data, st.gas, st.value, msg.Nonce())
 		} else {
 			log.Info("radni: executing delayed")
+			log.Info((*(st.evm.StateDB.GetBalance(st.to()))).String())
 			// Increment the nonce for the next transaction
 			//st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 			ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+			log.Info((*(st.evm.StateDB.GetBalance(st.to()))).String())
 		}
 	}
 

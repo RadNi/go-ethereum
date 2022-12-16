@@ -23,6 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"strconv"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
@@ -531,9 +532,11 @@ func (w *worker) mainLoop() {
 	for {
 		select {
 		case req := <-w.newWorkCh:
+			log.Info("newWorkCh")
 			w.commitWork(req.interrupt, req.noempty, req.timestamp)
 
 		case req := <-w.getWorkCh:
+			log.Info("getWorkCh")
 			block, err := w.generateWork(req.params)
 			if err != nil {
 				req.err <- err
@@ -543,6 +546,7 @@ func (w *worker) mainLoop() {
 				req.result <- block
 			}
 		case ev := <-w.chainSideCh:
+			log.Info("chainSideCh")
 			// Short circuit for duplicate side blocks
 			if _, exist := w.localUncles[ev.Block.Hash()]; exist {
 				continue
@@ -567,6 +571,7 @@ func (w *worker) mainLoop() {
 			}
 
 		case <-cleanTicker.C:
+			log.Info("cleanTicker")
 			chainHead := w.chain.CurrentBlock()
 			for hash, uncle := range w.localUncles {
 				if uncle.NumberU64()+staleThreshold <= chainHead.NumberU64() {
@@ -585,6 +590,7 @@ func (w *worker) mainLoop() {
 			// Note all transactions received may not be continuous with transactions
 			// already included in the current sealing block. These transactions will
 			// be automatically eliminated.
+			log.Info("txsCh")
 			if !w.isRunning() && w.current != nil {
 				// If block is already full, abort
 				if gp := w.current.gasPool; gp != nil && gp.Gas() < params.TxGas {
@@ -887,11 +893,12 @@ func (w *worker) commitDelayedTransactions(env *environment, txs types.Transacti
 		// Start executing the transaction
 		env.state.Prepare(tx.Hash(), env.tcount)
 
-		(*tx).SetMode(types.Delayed)
+		//(*tx).SetMode(types.Delayed)
 
 		log.Info("radni: Executing delayed transaction:")
 		log.Info(tx.Hash().Hex())
 		logs, err := w.commitTransaction(env, tx)
+		//(*tx).SetMode(types.Encrypted) // TODO It needs to be immutable. Other requests might fail. Need to use Message instead of trx
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -988,13 +995,15 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 		}
 		// Start executing the transaction
 		env.state.Prepare(tx.Hash(), env.tcount)
+		//prev := tx.Mode()
 
-		if currentLen := w.chain.CurrentBlock().NumberU64(); currentLen >= 10 {
-			tx.SetMode(types.Encrypted)
-		} else {
-			tx.SetMode(types.Normal)
-		}
+		//if currentLen := w.chain.CurrentBlock().NumberU64(); currentLen >= 10 {
+		//	tx.SetMode(types.Encrypted)
+		//} else {
+		//	tx.SetMode(types.Normal)
+		//}
 		logs, err := w.commitTransaction(env, tx)
+		//tx.SetMode(prev) // TODO
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -1185,16 +1194,20 @@ func (w *worker) generateWork(params *generateParams) (*types.Block, error) {
 	}
 	defer work.discard()
 
+	currentLen := w.chain.CurrentBlock().NumberU64()
 	if !params.noTxs {
-		if currentLen := w.chain.CurrentBlock().NumberU64(); currentLen >= 10 {
+		if currentLen >= 10 {
 			var delay uint64 = 2
 			// Activate encryption
 			b := w.chain.GetBlockByNumber(currentLen - delay)
 			var txs types.Transactions
 			for _, tx := range b.Transactions() {
 				if tx.Mode() == types.Encrypted {
-					txs = append(txs, tx)
+					temp := tx.Copy()
+					(*temp).SetMode(types.Delayed)
+					txs = append(txs, temp)
 				}
+				log.Info("radni: okayy")
 			}
 			if err := w.commitDelayedTransactions(work, txs, nil); err != nil {
 				log.Info("intoOo")

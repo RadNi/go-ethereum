@@ -252,6 +252,10 @@ func (tx *Transaction) Protected() bool {
 	}
 }
 
+func (tx *Transaction) Copy() *Transaction {
+	return NewTx(tx.inner.copy())
+}
+
 // Type returns the transaction type.
 func (tx *Transaction) Mode() byte {
 	return tx.inner.txMode()

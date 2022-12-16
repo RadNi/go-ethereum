@@ -290,7 +290,8 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 			return valid(nil), beacon.InvalidPayloadAttributes.With(err)
 		}
 		id := computePayloadId(update.HeadBlockHash, payloadAttributes)
-		log.Info("radni: api.localBlocks.put, inja bayad block ro shoro kone por kardan")
+		log.Info("radni: api.localBlocks.put, inja bayad block ro shoro kone por kardan baraie:")
+		log.Info(id.String())
 		api.localBlocks.put(id, &payload{empty: empty, result: resCh})
 		return valid(&id), nil
 	}
