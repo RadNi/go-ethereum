@@ -15,23 +15,34 @@ var _ = (*payloadAttributesMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (p PayloadAttributesV1) MarshalJSON() ([]byte, error) {
 	type PayloadAttributesV1 struct {
-		Timestamp             hexutil.Uint64 `json:"timestamp"     gencodec:"required"`
-		Random                common.Hash    `json:"prevRandao"        gencodec:"required"`
-		SuggestedFeeRecipient common.Address `json:"suggestedFeeRecipient"  gencodec:"required"`
+		Timestamp             hexutil.Uint64  `json:"timestamp"              gencodec:"required"`
+		Random                common.Hash     `json:"prevRandao"             gencodec:"required"`
+		SuggestedFeeRecipient common.Address  `json:"suggestedFeeRecipient"  gencodec:"required"`
+		D                     hexutil.Bytes   `json:"d" gencodec:"required"`
+		Primes                []hexutil.Bytes `json:"primes" gencodec:"required"`
 	}
 	var enc PayloadAttributesV1
 	enc.Timestamp = hexutil.Uint64(p.Timestamp)
 	enc.Random = p.Random
 	enc.SuggestedFeeRecipient = p.SuggestedFeeRecipient
+	enc.D = p.D
+	if p.Primes != nil {
+		enc.Primes = make([]hexutil.Bytes, len(p.Primes))
+		for k, v := range p.Primes {
+			enc.Primes[k] = v
+		}
+	}
 	return json.Marshal(&enc)
 }
 
 // UnmarshalJSON unmarshals from JSON.
 func (p *PayloadAttributesV1) UnmarshalJSON(input []byte) error {
 	type PayloadAttributesV1 struct {
-		Timestamp             *hexutil.Uint64 `json:"timestamp"     gencodec:"required"`
-		Random                *common.Hash    `json:"prevRandao"        gencodec:"required"`
+		Timestamp             *hexutil.Uint64 `json:"timestamp"              gencodec:"required"`
+		Random                *common.Hash    `json:"prevRandao"             gencodec:"required"`
 		SuggestedFeeRecipient *common.Address `json:"suggestedFeeRecipient"  gencodec:"required"`
+		D                     *hexutil.Bytes  `json:"d" gencodec:"required"`
+		Primes                []hexutil.Bytes `json:"primes" gencodec:"required"`
 	}
 	var dec PayloadAttributesV1
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -49,5 +60,16 @@ func (p *PayloadAttributesV1) UnmarshalJSON(input []byte) error {
 		return errors.New("missing required field 'suggestedFeeRecipient' for PayloadAttributesV1")
 	}
 	p.SuggestedFeeRecipient = *dec.SuggestedFeeRecipient
+	if dec.D == nil {
+		return errors.New("missing required field 'd' for PayloadAttributesV1")
+	}
+	p.D = *dec.D
+	if dec.Primes == nil {
+		return errors.New("missing required field 'primes' for PayloadAttributesV1")
+	}
+	p.Primes = make([][]byte, len(dec.Primes))
+	for k, v := range dec.Primes {
+		p.Primes[k] = v
+	}
 	return nil
 }

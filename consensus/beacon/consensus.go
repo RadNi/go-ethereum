@@ -344,6 +344,10 @@ func (beacon *Beacon) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
 	}
 	// Finalize and assemble the block
 	beacon.Finalize(chain, header, state, txs, uncles)
+	fmt.Println("Finalize And Assemble: %d", len(txs))
+	if len(txs) >= 1 {
+		fmt.Println("\t %v", txs[0].Hash().String())
+	}
 	return types.NewBlock(header, txs, uncles, receipts, trie.NewStackTrie(nil)), nil
 }
 

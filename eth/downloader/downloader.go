@@ -1404,6 +1404,7 @@ func (d *Downloader) processHeaders(origin uint64, td, ttd *big.Int, beaconMode 
 						}
 					}
 					if len(chunkHeaders) > 0 {
+						log.Info("a block was received")
 						if n, err := d.lightchain.InsertHeaderChain(chunkHeaders, frequency); err != nil {
 							rollbackErr = err
 

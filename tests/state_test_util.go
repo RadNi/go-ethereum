@@ -231,7 +231,7 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, snapsh
 	snapshot := statedb.Snapshot()
 	gaspool := new(core.GasPool)
 	gaspool.AddGas(block.GasLimit())
-	if _, err := core.ApplyMessage(evm, msg, gaspool, false); err != nil {
+	if _, err := core.ApplyMessage(evm, msg, gaspool); err != nil {
 		statedb.RevertToSnapshot(snapshot)
 	}
 	// Add 0-value mining reward. This only makes a difference in the cases
@@ -360,7 +360,7 @@ func (tx *stTransaction) toMessage(ps stPostState, baseFee *big.Int) (core.Messa
 	}
 
 	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, gasPrice,
-		tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, accessList, false)
+		tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, accessList, false, types.Normal)
 	return msg, nil
 }
 

@@ -863,7 +863,7 @@ func testExternalUI(api *core.SignerAPI) {
 		data := hexutil.Bytes([]byte{})
 		to := common.NewMixedcaseAddress(a)
 		tx := apitypes.SendTxArgs{
-			Mode:	  core.Normal,
+			Mode:     types.Normal,
 			Data:     &data,
 			Nonce:    0x1,
 			Value:    hexutil.Big(*big.NewInt(6)),
@@ -998,7 +998,7 @@ func GenDoc(ctx *cli.Context) error {
 				{Typ: "Info", Message: "User should see this as well"},
 			},
 			Transaction: apitypes.SendTxArgs{
-				Mode:	  core.Normal,
+				Mode:     types.Normal,
 				Data:     &data,
 				Nonce:    0x1,
 				Value:    hexutil.Big(*big.NewInt(6)),
@@ -1015,7 +1015,7 @@ func GenDoc(ctx *cli.Context) error {
 			", because the UI is free to make modifications to the transaction.",
 			&core.SignTxResponse{Approved: true,
 				Transaction: apitypes.SendTxArgs{
-					Mode:	  core.Normal,
+					Mode:     types.Normal,
 					Data:     &data,
 					Nonce:    0x4,
 					Value:    hexutil.Big(*big.NewInt(6)),

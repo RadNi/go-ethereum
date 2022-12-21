@@ -2223,6 +2223,7 @@ func (bc *BlockChain) updateFutureBlocks() {
 	for {
 		select {
 		case <-futureTimer.C:
+			log.Info("radni: that is this one !")
 			bc.procFutureBlocks()
 		case <-bc.quit:
 			return

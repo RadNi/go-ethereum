@@ -22,6 +22,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto/rsa"
 	"math/big"
 	"sync"
 	"time"
@@ -143,19 +144,33 @@ func NewConsensusAPI(eth *eth.Ethereum) *ConsensusAPI {
 
 // ForkchoiceUpdatedV1 has several responsibilities:
 // If the method is called with an empty head block:
-// 		we return success, which can be used to check if the engine API is enabled
+//
+//	we return success, which can be used to check if the engine API is enabled
+//
 // If the total difficulty was not reached:
-// 		we return INVALID
+//
+//	we return INVALID
+//
 // If the finalizedBlockHash is set:
-// 		we check if we have the finalizedBlockHash in our db, if not we start a sync
+//
+//	we check if we have the finalizedBlockHash in our db, if not we start a sync
+//
 // We try to set our blockchain to the headBlock
 // If there are payloadAttributes:
-// 		we try to assemble a block with the payloadAttributes and return its payloadID
+//
+//	we try to assemble a block with the payloadAttributes and return its payloadID
 func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, payloadAttributes *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
 	api.forkchoiceLock.Lock()
 	defer api.forkchoiceLock.Unlock()
 
 	log.Trace("Engine API request received", "method", "ForkchoiceUpdated", "head", update.HeadBlockHash, "finalized", update.FinalizedBlockHash, "safe", update.SafeBlockHash)
+	log.Info("###############Attributes:")
+	fmt.Printf("%d\n", payloadAttributes.Timestamp)
+	if payloadAttributes.D != nil {
+		fmt.Printf("%v\n", payloadAttributes.D)
+		prv := rsa.ImportPrivateKey()
+		fmt.Printf("%v\n", prv.D)
+	}
 	if update.HeadBlockHash == (common.Hash{}) {
 		log.Warn("Forkchoice requested update to zero hash")
 		return beacon.STATUS_INVALID, nil // TODO(karalabe): Why does someone send us this?

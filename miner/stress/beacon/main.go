@@ -159,6 +159,7 @@ func (n *ethNode) assembleBlock(parentHash common.Hash, parentTimestamp uint64) 
 		SafeBlockHash:      common.Hash{},
 		FinalizedBlockHash: common.Hash{},
 	}
+	log.Info("radni: assembleBlock")
 	payload, err := n.api.ForkchoiceUpdatedV1(fcState, &payloadAttribute)
 	if err != nil {
 		return nil, err
@@ -172,6 +173,7 @@ func (n *ethNode) insertBlock(eb beacon.ExecutableDataV1) error {
 	}
 	switch n.typ {
 	case eth2NormalNode, eth2MiningNode:
+		log.Info("radni: into")
 		newResp, err := n.api.NewPayloadV1(eb)
 		if err != nil {
 			return err
@@ -210,11 +212,13 @@ func (n *ethNode) insertBlockAndSetHead(parent *types.Header, ed beacon.Executab
 	}
 	switch n.typ {
 	case eth2NormalNode, eth2MiningNode:
+		log.Info("radni: insertBlockAndSetHead 1")
 		if _, err := n.api.ForkchoiceUpdatedV1(fcState, nil); err != nil {
 			return err
 		}
 		return nil
 	case eth2LightClient:
+		log.Info("radni: insertBlockAndSetHead 2")
 		if _, err := n.lapi.ForkchoiceUpdatedV1(fcState, nil); err != nil {
 			return err
 		}
@@ -422,7 +426,7 @@ func main() {
 		node := nodes[index%len(nodes)]
 
 		// Create a self transaction and inject into the pool
-		tx, err := types.SignTx(types.NewTransaction(nonces[index], crypto.PubkeyToAddress(faucets[index].PublicKey), new(big.Int), 21000, big.NewInt(100000000000+rand.Int63n(65536)), nil), types.HomesteadSigner{}, faucets[index])
+		tx, err := types.SignTx(types.NewTransaction(nonces[index], crypto.PubkeyToAddress(faucets[index].PublicKey), new(big.Int), 21000, big.NewInt(100000000000+rand.Int63n(65536)), nil, types.Normal), types.HomesteadSigner{}, faucets[index])
 		if err != nil {
 			panic(err)
 		}

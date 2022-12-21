@@ -20,10 +20,10 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
-	"strconv"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
@@ -940,7 +940,6 @@ func (w *worker) commitDelayedTransactions(env *environment, txs types.Transacti
 	return nil
 }
 
-
 func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByPriceAndNonce, interrupt *int32) error {
 	gasLimit := env.header.GasLimit
 	if env.gasPool == nil {
@@ -1215,8 +1214,14 @@ func (w *worker) generateWork(params *generateParams) (*types.Block, error) {
 				return nil, err
 			}
 		}
+		log.Info("radni: pass az inja rad mishe")
+		log.Info(strconv.FormatUint(currentLen, 10))
+		if currentLen >= 5 {
+			fmt.Println(len(w.chain.GetBlockByNumber(currentLen - 2).Transactions()))
+		}
 		w.fillTransactions(nil, work)
 	}
+	log.Info("radni: ya inja")
 	return w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, work.txs, work.unclelist(), work.receipts)
 }
 
@@ -1247,6 +1252,8 @@ func (w *worker) commitWork(interrupt *int32, noempty bool, timestamp int64) {
 		w.commit(work.copy(), nil, false, start)
 	}
 
+	log.Info("in oskol chie?!")
+
 	// Fill pending transactions from the txpool
 	err = w.fillTransactions(interrupt, work)
 	if errors.Is(err, errBlockInterruptedByNewHead) {
@@ -1275,6 +1282,7 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		// Create a local environment copy, avoid the data race with snapshot state.
 		// https://github.com/ethereum/go-ethereum/issues/24299
 		env := env.copy()
+		log.Info("radni: az to in miad?")
 		block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, env.unclelist(), env.receipts)
 		if err != nil {
 			return err
