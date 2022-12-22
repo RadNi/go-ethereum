@@ -166,8 +166,8 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 	log.Trace("Engine API request received", "method", "ForkchoiceUpdated", "head", update.HeadBlockHash, "finalized", update.FinalizedBlockHash, "safe", update.SafeBlockHash)
 	log.Info("###############Attributes:")
 	fmt.Printf("%d\n", payloadAttributes.Timestamp)
-	if payloadAttributes.D != nil {
-		fmt.Printf("%v\n", payloadAttributes.D)
+	if payloadAttributes.TimelockPrivatekey != nil {
+		fmt.Printf("%v\n", payloadAttributes.TimelockPrivatekey.D)
 		prv := rsa.ImportPrivateKey()
 		fmt.Printf("%v\n", prv.D)
 	}

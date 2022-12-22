@@ -26,21 +26,21 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 )
 
-////go:generate go run github.com/fjl/gencodec -type RSAPublicKey -field-override rsaPublicKeyMarshaling -out gen_pubkey.go
-//
-//type RSAPublicKey struct {
-//	N []byte `json:"n"     gencodec:"required"`
-//	E uint64 `json:"e"     gencodec:"required"`
-//}
-//
-////go:generate go run github.com/fjl/gencodec -type RSAPrivateKey -field-override rsaPrivateKeyMarshaling -out gen_prvkey.go
-//
-//type RSAPrivateKey struct {
-//	PublicKey *RSAPublicKey `json:"publicKey"     gencodec:"required"`
-//	D         []byte        `json:"d"             gencodec:"required"`
-//	Primes    []uint64      `json:"primes"        gencodec:"required"`
-//}
-//
+//go:generate go run github.com/fjl/gencodec -type RSAPublicKey -field-override rsaPublicKeyMarshaling -out gen_pubkey.go
+
+type RSAPublicKey struct {
+	N []byte `json:"n"     gencodec:"required"`
+	E uint64 `json:"e"     gencodec:"required"`
+}
+
+//go:generate go run github.com/fjl/gencodec -type RSAPrivateKey -field-override rsaPrivateKeyMarshaling -out gen_prvkey.go
+
+type RSAPrivateKey struct {
+	PublicKey *RSAPublicKey `json:"publicKey"     gencodec:"required"`
+	D         []byte        `json:"d"             gencodec:"required"`
+	Primes    [][]byte      `json:"primes"        gencodec:"required"`
+}
+
 //go:generate go run github.com/fjl/gencodec -type PayloadAttributesV1 -field-override payloadAttributesMarshaling -out gen_blockparams.go
 
 // PayloadAttributesV1 structure described at https://github.com/ethereum/execution-apis/pull/74
@@ -48,29 +48,27 @@ type PayloadAttributesV1 struct {
 	Timestamp             uint64         `json:"timestamp"              gencodec:"required"`
 	Random                common.Hash    `json:"prevRandao"             gencodec:"required"`
 	SuggestedFeeRecipient common.Address `json:"suggestedFeeRecipient"  gencodec:"required"`
-	D                     []byte         `json:"d" gencodec:"required"`
-	Primes                [][]byte       `json:"primes" gencodec:"required"`
-	//TimelockPrivatekey    *RSAPrivateKey `json:"timelockPrivatekey"`
+	//D                     []byte         `json:"d" gencodec:"required"`
+	//Primes                [][]byte       `json:"primes" gencodec:"required"`
+	TimelockPrivatekey *RSAPrivateKey `json:"timelockPrivatekey"`
 }
 
-//// JSON type overrides for RSAPublicKey.
-//type rsaPublicKeyMarshaling struct {
-//	N []byte `json:"n"     gencodec:"required"`
-//	E uint64 `json:"e"     gencodec:"required"`
-//}
-//
-//// JSON type overrides for RSAPrivateKey.
-//type rsaPrivateKeyMarshaling struct {
-//	PublicKey *RSAPublicKey `json:"publicKey"     gencodec:"required"`
-//	D         []byte        `json:"d"             gencodec:"required"`
-//	Primes    []uint64      `json:"primes"        gencodec:"required"`
-//}
+// JSON type overrides for RSAPublicKey.
+type rsaPublicKeyMarshaling struct {
+	N hexutil.Bytes  `json:"n"     gencodec:"required"`
+	E hexutil.Uint64 `json:"e"     gencodec:"required"`
+}
+
+// JSON type overrides for RSAPrivateKey.
+type rsaPrivateKeyMarshaling struct {
+	PublicKey *RSAPublicKey   `json:"publicKey"     gencodec:"required"`
+	D         hexutil.Bytes   `json:"d" gencodec:"required"`
+	Primes    []hexutil.Bytes `json:"primes" gencodec:"required"`
+}
 
 // JSON type overrides for PayloadAttributesV1.
 type payloadAttributesMarshaling struct {
 	Timestamp hexutil.Uint64
-	D         hexutil.Bytes  `json:"d" gencodec:"required"`
-	Primes    []hexutil.Bytes `json:"primes" gencodec:"required"`
 }
 
 //go:generate go run github.com/fjl/gencodec -type ExecutableDataV1 -field-override executableDataMarshaling -out gen_ed.go
