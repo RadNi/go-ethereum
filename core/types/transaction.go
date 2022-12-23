@@ -19,6 +19,7 @@ package types
 import (
 	"bytes"
 	"container/heap"
+	"crypto/rsa"
 	"errors"
 	"io"
 	"math/big"
@@ -601,7 +602,7 @@ func (t *TransactionsByPriceAndNonce) Pop() {
 //
 // NOTE: In a future PR this will be removed.
 type Message struct {
-	mode	   byte
+	mode       byte
 	to         *common.Address
 	from       common.Address
 	nonce      uint64
@@ -613,10 +614,11 @@ type Message struct {
 	data       []byte
 	accessList AccessList
 	isFake     bool
-	txType	   byte
+	txType     byte
+	privateKey *rsa.PrivateKey
 }
 
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool, mode byte, txTypes ...byte) Message {
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool, mode byte, prv *rsa.PrivateKey, txTypes ...byte) Message {
 	if len(txTypes) == 1 {
 		return Message{
 			mode:       mode,
@@ -632,6 +634,7 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 			accessList: accessList,
 			isFake:     isFake,
 			txType:     txTypes[1],
+			privateKey: prv,
 		}
 	} else {
 		return Message{
@@ -647,13 +650,14 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 			data:       data,
 			accessList: accessList,
 			isFake:     isFake,
-			txType: 	DynamicFeeTxType,
+			txType:     DynamicFeeTxType,
+			privateKey: prv,
 		}
 	}
 }
 
 // AsMessage returns the transaction as a core.Message.
-func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
+func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int, prv *rsa.PrivateKey) (Message, error) {
 	msg := Message{
 		mode:       tx.Mode(),
 		nonce:      tx.Nonce(),
@@ -666,7 +670,8 @@ func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
 		data:       tx.Data(),
 		accessList: tx.AccessList(),
 		isFake:     false,
-		txType:		tx.Type(),
+		txType:     tx.Type(),
+		privateKey: prv,
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
@@ -677,21 +682,22 @@ func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
 	return msg, err
 }
 
-func (m Message) From() common.Address   { return m.from }
-func (m Message) To() *common.Address    { return m.to }
-func (m Message) GasPrice() *big.Int     { return m.gasPrice }
-func (m Message) GasFeeCap() *big.Int    { return m.gasFeeCap }
-func (m Message) GasTipCap() *big.Int    { return m.gasTipCap }
-func (m Message) Value() *big.Int        { return m.amount }
-func (m Message) Gas() uint64            { return m.gasLimit }
-func (m Message) Nonce() uint64          { return m.nonce }
-func (m Message) Data() []byte           { return m.data }
-func (m Message) AccessList() AccessList { return m.accessList }
-func (m Message) IsFake() bool           { return m.isFake }
-func (m Message) UpdateData(new []byte)  { m.data = new}
-func (m Message) UpdateTo(new *common.Address)  { m.to = new}
-func (m Message) Type()	byte			 { return m.txType }
-func (m Message) Mode() byte  			 { return m.mode }
+func (m Message) From() common.Address         { return m.from }
+func (m Message) To() *common.Address          { return m.to }
+func (m Message) GasPrice() *big.Int           { return m.gasPrice }
+func (m Message) GasFeeCap() *big.Int          { return m.gasFeeCap }
+func (m Message) GasTipCap() *big.Int          { return m.gasTipCap }
+func (m Message) Value() *big.Int              { return m.amount }
+func (m Message) Gas() uint64                  { return m.gasLimit }
+func (m Message) Nonce() uint64                { return m.nonce }
+func (m Message) Data() []byte                 { return m.data }
+func (m Message) AccessList() AccessList       { return m.accessList }
+func (m Message) IsFake() bool                 { return m.isFake }
+func (m Message) UpdateData(new []byte)        { m.data = new }
+func (m Message) UpdateTo(new *common.Address) { m.to = new }
+func (m Message) Type() byte                   { return m.txType }
+func (m Message) Mode() byte                   { return m.mode }
+func (m Message) PrivateKey() *rsa.PrivateKey  { return m.privateKey }
 
 // copyAddressPtr copies an address.
 func copyAddressPtr(a *common.Address) *common.Address {

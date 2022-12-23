@@ -1,4 +1,5 @@
 package rsa
+
 import (
 	"crypto/rand"
 	"crypto/rsa"
@@ -7,12 +8,13 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 
 	"github.com/ethereum/go-ethereum/log"
 )
 
-func ExportRsaPublicKeyAsPemStr(pubkey *rsa.PublicKey) (string) {
+func ExportRsaPublicKeyAsPemStr(pubkey *rsa.PublicKey) string {
 	pubkey_bytes, err := x509.MarshalPKIXPublicKey(pubkey)
 	if err != nil {
 		return ""
@@ -104,7 +106,7 @@ func ExportPublickey(pub *rsa.PublicKey) {
 	fmt.Printf("Wrote %d bytes\n", num)
 }
 
-func ImportPublicKey() (*rsa.PublicKey) {
+func ImportPublicKey() *rsa.PublicKey {
 	b, err := os.ReadFile("pub.pem") // just pass the file name
 	if err != nil {
 		fmt.Print(err)
@@ -116,8 +118,7 @@ func ImportPublicKey() (*rsa.PublicKey) {
 	return pub
 }
 
-
-func ImportPrivateKey() (*rsa.PrivateKey) {
+func ImportPrivateKey() *rsa.PrivateKey {
 	b, err := os.ReadFile("prv.pem") // just pass the file name
 	if err != nil {
 		fmt.Print(err)
@@ -125,6 +126,32 @@ func ImportPrivateKey() (*rsa.PrivateKey) {
 	prvPEM := string(b)
 	prv, _ := ParseRsaPrivateKeyFromPemStr(prvPEM)
 	return prv
+}
+
+func NewPublicKey() {
+
+}
+
+func NewPrivateKey(d []byte, p [][]byte, n []byte, e uint64) *rsa.PrivateKey {
+	D := new(big.Int).SetBytes(d)
+	primes := make([]*big.Int, len(p))
+	for i, prime := range p {
+		primes[i] = new(big.Int).SetBytes(prime)
+	}
+	return &rsa.PrivateKey{
+		PublicKey: rsa.PublicKey{
+			N: new(big.Int).SetBytes(n),
+			E: int(e),
+		},
+		D:      D,
+		Primes: primes,
+		Precomputed: rsa.PrecomputedValues{
+			Dp:        nil,
+			Dq:        nil,
+			Qinv:      nil,
+			CRTValues: nil,
+		},
+	}
 }
 
 func KeyGen() (*rsa.PrivateKey, error) {
@@ -140,7 +167,7 @@ func KeyGen() (*rsa.PrivateKey, error) {
 	return prv, nil
 }
 
-func Encrypt(message []byte, pk *rsa.PublicKey) ([]byte, error){
+func Encrypt(message []byte, pk *rsa.PublicKey) ([]byte, error) {
 	label := []byte("orders")
 
 	// crypto/rand.Reader is a good source of entropy for randomizing the
@@ -158,7 +185,6 @@ func Encrypt(message []byte, pk *rsa.PublicKey) ([]byte, error){
 	fmt.Printf("Ciphertext: %x\n", ciphertext)
 	return ciphertext, nil
 }
-
 
 func Decrypt(ciphertext []byte, sk *rsa.PrivateKey) ([]byte, error) {
 	rng := rand.Reader

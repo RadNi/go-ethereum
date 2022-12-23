@@ -18,6 +18,7 @@ package backends
 
 import (
 	"context"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"math/big"
@@ -815,7 +816,7 @@ type callMsg struct {
 	ethereum.CallMsg
 }
 
-func (m callMsg) Mode() byte		           { return m.CallMsg.Mode }
+func (m callMsg) Mode() byte                   { return m.CallMsg.Mode }
 func (m callMsg) From() common.Address         { return m.CallMsg.From }
 func (m callMsg) Nonce() uint64                { return 0 }
 func (m callMsg) IsFake() bool                 { return true }
@@ -827,9 +828,11 @@ func (m callMsg) Gas() uint64                  { return m.CallMsg.Gas }
 func (m callMsg) Value() *big.Int              { return m.CallMsg.Value }
 func (m callMsg) Data() []byte                 { return m.CallMsg.Data }
 func (m callMsg) AccessList() types.AccessList { return m.CallMsg.AccessList }
-//func (m callMsg) UpdateData(new []byte)  	   { m.CallMsg.UpdateData }
-//func (m callMsg) UpdateTo(new *common.Address) { m.CallMsg.UpdateTo }
-func (m callMsg) Type()	byte			 	   { return m.CallMsg.Type }
+
+// func (m callMsg) UpdateData(new []byte)  	   { m.CallMsg.UpdateData }
+// func (m callMsg) UpdateTo(new *common.Address) { m.CallMsg.UpdateTo }
+func (m callMsg) Type() byte                  { return m.CallMsg.Type }
+func (m callMsg) PrivateKey() *rsa.PrivateKey { return m.CallMsg.PrivateKey }
 
 // filterBackend implements filters.Backend to support filtering for logs without
 // taking bloom-bits acceleration structures into account.

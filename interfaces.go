@@ -19,6 +19,7 @@ package ethereum
 
 import (
 	"context"
+	"crypto/rsa"
 	"errors"
 	"math/big"
 
@@ -132,7 +133,7 @@ type ChainSyncReader interface {
 
 // CallMsg contains parameters for contract calls.
 type CallMsg struct {
-	Mode	  byte
+	Mode      byte
 	From      common.Address  // the sender of the 'transaction'
 	To        *common.Address // the destination contract (nil for contract creation)
 	Gas       uint64          // if 0, the call executes with near-infinite gas
@@ -144,10 +145,12 @@ type CallMsg struct {
 
 	AccessList types.AccessList // EIP-2930 access list.
 
-	Type		byte
+	Type       byte
+	PrivateKey *rsa.PrivateKey
 }
-func (m CallMsg) UpdateData(new []byte)  	   { m.Data = new }
-func (m CallMsg) UpdateTo(new *common.Address)  	   { m.To = new }
+
+func (m CallMsg) UpdateData(new []byte)        { m.Data = new }
+func (m CallMsg) UpdateTo(new *common.Address) { m.To = new }
 
 // A ContractCaller provides contract calls, essentially transactions that are executed by
 // the EVM but not mined into the blockchain. ContractCall is a low-level method to

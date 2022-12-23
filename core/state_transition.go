@@ -17,6 +17,7 @@
 package core
 
 import (
+	brsa "crypto/rsa"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -34,7 +35,6 @@ import (
 )
 
 var emptyCodeHash = crypto.Keccak256Hash(nil)
-
 
 /*
 The State Transitioning Model
@@ -87,6 +87,8 @@ type Message interface {
 	UpdateData([]byte)
 	Type() byte
 	UpdateTo(*common.Address)
+
+	PrivateKey() *brsa.PrivateKey
 }
 
 // ExecutionResult includes all output after executing given evm
@@ -324,8 +326,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	//log.Info(st.msg.Value())
 	if mode == types.Delayed {
 		log.Info("dare az koja miad?1")
-		prv := rsa.ImportPrivateKey()
-		decryptedData, e := rsa.DecryptMulti(st.data, prv)
+		//prv := rsa.ImportPrivateKey()
+		decryptedData, e := rsa.DecryptMulti(st.data, st.msg.PrivateKey())
 		if e != nil {
 			return nil, e
 		}

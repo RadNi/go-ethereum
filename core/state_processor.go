@@ -17,7 +17,10 @@
 package core
 
 import (
+	brsa "crypto/rsa"
 	"fmt"
+	"github.com/ethereum/go-ethereum/core/beacon"
+	"github.com/ethereum/go-ethereum/crypto/rsa"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -83,7 +86,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		var orderedEncryptedTransaction types.Transactions
 		var orderedDelayedTransaction types.Transactions
 		pb = p.bc.GetBlockByNumber(currentLen - delay)
-		for _, tx := range pb.Transactions(){
+		for _, tx := range pb.Transactions() {
 			if tx.Mode() == types.Encrypted {
 				orderedEncryptedTransaction = append(orderedEncryptedTransaction, tx)
 			}
@@ -97,7 +100,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			return nil, nil, 0, fmt.Errorf("Encrypted transactions number doesn't match delayed transactions'")
 		}
 		for i, tx := range orderedEncryptedTransaction {
-			if tx.Hash() == orderedDelayedTransaction[i].Hash(){
+			if tx.Hash() == orderedDelayedTransaction[i].Hash() {
 				return nil, nil, 0, fmt.Errorf("encrypted tx %d [%v] hasn't been applied into current block", i, tx.Hash().Hex())
 			}
 		}
@@ -108,7 +111,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 				return nil, nil, 0, fmt.Errorf("after the transition, tx of Normal type is not allowed tx %d [%v]", i, tx.Hash().Hex())
 			}
 		}
-		msg, err := tx.AsMessage(types.MakeSigner(p.config, header.Number), header.BaseFee)
+		prv := rsa.ImportPrivateKey()
+		msg, err := tx.AsMessage(types.MakeSigner(p.config, header.Number), header.BaseFee, prv)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
@@ -178,9 +182,15 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, author *com
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, error) {
+func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config, prv *beacon.RSAPrivateKey) (*types.Receipt, error) {
 	log.Info("nakone ine?")
-	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number), header.BaseFee)
+	var privateKey *brsa.PrivateKey
+	if prv == nil {
+		privateKey = nil
+	} else {
+		privateKey = rsa.NewPrivateKey(prv.D, prv.Primes, prv.PublicKey.N, prv.PublicKey.E)
+	}
+	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number), header.BaseFee, privateKey)
 	if err != nil {
 		return nil, err
 	}
