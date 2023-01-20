@@ -17,7 +17,6 @@
 package core
 
 import (
-	brsa "crypto/rsa"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -88,7 +87,7 @@ type Message interface {
 	Type() byte
 	UpdateTo(*common.Address)
 
-	PrivateKey() *brsa.PrivateKey
+	PrivateKey() *types.RSAPrivateKey
 }
 
 // ExecutionResult includes all output after executing given evm

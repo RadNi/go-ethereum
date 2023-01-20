@@ -36,6 +36,34 @@ var (
 	EmptyUncleHash = rlpHash([]*Header(nil))
 )
 
+//go:generate go run github.com/fjl/gencodec -type RSAPublicKey -field-override rsaPublicKeyMarshaling -out gen_pubkey.go
+
+type RSAPublicKey struct {
+	N []byte `json:"n"     gencodec:"required"`
+	E uint64 `json:"e"     gencodec:"required"`
+}
+
+//go:generate go run github.com/fjl/gencodec -type RSAPrivateKey -field-override rsaPrivateKeyMarshaling -out gen_prvkey.go
+
+type RSAPrivateKey struct {
+	PublicKey *RSAPublicKey `json:"publicKey"     gencodec:"required"`
+	D         []byte        `json:"d"             gencodec:"required"`
+	Primes    [][]byte      `json:"primes"        gencodec:"required"`
+}
+
+// JSON type overrides for RSAPublicKey.
+type rsaPublicKeyMarshaling struct {
+	N hexutil.Bytes  `json:"n"     gencodec:"required"`
+	E hexutil.Uint64 `json:"e"     gencodec:"required"`
+}
+
+// JSON type overrides for RSAPrivateKey.
+type rsaPrivateKeyMarshaling struct {
+	PublicKey *RSAPublicKey   `json:"publicKey"     gencodec:"required"`
+	D         hexutil.Bytes   `json:"d" gencodec:"required"`
+	Primes    []hexutil.Bytes `json:"primes" gencodec:"required"`
+}
+
 // A BlockNonce is a 64-bit hash which proves (combined with the
 // mix-hash) that a sufficient amount of computation has been carried
 // out on a block.
@@ -85,7 +113,8 @@ type Header struct {
 	Nonce       BlockNonce     `json:"nonce"`
 
 	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
-	BaseFee *big.Int `json:"baseFeePerGas" rlp:"optional"`
+	BaseFee            *big.Int       `json:"baseFeePerGas" rlp:"optional"`
+	TimelockPrivatekey *RSAPrivateKey `json:"timelockPrivatekey" rlp:"optional"`
 
 	/*
 		TODO (MariusVanDerWijden) Add this field once needed
@@ -231,6 +260,31 @@ func NewBlockWithHeader(header *Header) *Block {
 	return &Block{header: CopyHeader(header)}
 }
 
+func CopyTimelockPrivatekey(prv *RSAPrivateKey) *RSAPrivateKey {
+	if prv == nil {
+		return nil
+	}
+	primes := make([][]byte, len(prv.Primes))
+	for i, v := range prv.Primes {
+		primes[i] = make([]byte, len(prv.Primes[i]))
+		copy(primes[i], v)
+	}
+	//parentRoot := bytesutil.SafeCopyBytes(header.ParentRoot)
+	//stateRoot := bytesutil.SafeCopyBytes(header.StateRoot)
+	//bodyRoot := bytesutil.SafeCopyBytes(header.BodyRoot)
+	cpy := &RSAPrivateKey{
+		PublicKey: &RSAPublicKey{
+			N: make([]byte, len(prv.PublicKey.N)),
+			E: prv.PublicKey.E,
+		},
+		Primes: primes,
+		D:      make([]byte, len(prv.D)),
+	}
+	copy(cpy.PublicKey.N, prv.PublicKey.N)
+	copy(cpy.D, prv.D)
+	return cpy
+}
+
 // CopyHeader creates a deep copy of a block header to prevent side effects from
 // modifying a header variable.
 func CopyHeader(h *Header) *Header {
@@ -248,6 +302,7 @@ func CopyHeader(h *Header) *Header {
 		cpy.Extra = make([]byte, len(h.Extra))
 		copy(cpy.Extra, h.Extra)
 	}
+	cpy.TimelockPrivatekey = CopyTimelockPrivatekey(h.TimelockPrivatekey)
 	return &cpy
 }
 
@@ -292,17 +347,18 @@ func (b *Block) GasUsed() uint64      { return b.header.GasUsed }
 func (b *Block) Difficulty() *big.Int { return new(big.Int).Set(b.header.Difficulty) }
 func (b *Block) Time() uint64         { return b.header.Time }
 
-func (b *Block) NumberU64() uint64        { return b.header.Number.Uint64() }
-func (b *Block) MixDigest() common.Hash   { return b.header.MixDigest }
-func (b *Block) Nonce() uint64            { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
-func (b *Block) Bloom() Bloom             { return b.header.Bloom }
-func (b *Block) Coinbase() common.Address { return b.header.Coinbase }
-func (b *Block) Root() common.Hash        { return b.header.Root }
-func (b *Block) ParentHash() common.Hash  { return b.header.ParentHash }
-func (b *Block) TxHash() common.Hash      { return b.header.TxHash }
-func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
-func (b *Block) UncleHash() common.Hash   { return b.header.UncleHash }
-func (b *Block) Extra() []byte            { return common.CopyBytes(b.header.Extra) }
+func (b *Block) NumberU64() uint64                  { return b.header.Number.Uint64() }
+func (b *Block) MixDigest() common.Hash             { return b.header.MixDigest }
+func (b *Block) Nonce() uint64                      { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
+func (b *Block) Bloom() Bloom                       { return b.header.Bloom }
+func (b *Block) Coinbase() common.Address           { return b.header.Coinbase }
+func (b *Block) Root() common.Hash                  { return b.header.Root }
+func (b *Block) ParentHash() common.Hash            { return b.header.ParentHash }
+func (b *Block) TxHash() common.Hash                { return b.header.TxHash }
+func (b *Block) ReceiptHash() common.Hash           { return b.header.ReceiptHash }
+func (b *Block) UncleHash() common.Hash             { return b.header.UncleHash }
+func (b *Block) Extra() []byte                      { return common.CopyBytes(b.header.Extra) }
+func (b *Block) TimelockPrivatekey() *RSAPrivateKey { return b.header.TimelockPrivatekey }
 
 func (b *Block) BaseFee() *big.Int {
 	if b.header.BaseFee == nil {

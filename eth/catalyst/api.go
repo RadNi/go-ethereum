@@ -22,7 +22,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/crypto/rsa"
+	"github.com/davecgh/go-spew/spew"
 	"math/big"
 	"sync"
 	"time"
@@ -163,14 +163,10 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 	api.forkchoiceLock.Lock()
 	defer api.forkchoiceLock.Unlock()
 
+	fmt.Printf("hamin avale kar too ForkChoice: \n")
+	spew.Dump(payloadAttributes.TimelockPrivatekey)
+
 	log.Trace("Engine API request received", "method", "ForkchoiceUpdated", "head", update.HeadBlockHash, "finalized", update.FinalizedBlockHash, "safe", update.SafeBlockHash)
-	log.Info("###############Attributes:")
-	fmt.Printf("%d\n", payloadAttributes.Timestamp)
-	if payloadAttributes.TimelockPrivatekey != nil {
-		fmt.Printf("%v\n", payloadAttributes.TimelockPrivatekey.D)
-		prv := rsa.ImportPrivateKey()
-		fmt.Printf("%v\n", prv.D)
-	}
 	if update.HeadBlockHash == (common.Hash{}) {
 		log.Warn("Forkchoice requested update to zero hash")
 		return beacon.STATUS_INVALID, nil // TODO(karalabe): Why does someone send us this?
@@ -291,6 +287,8 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 	// sealed by the beacon client. The payload will be requested later, and we
 	// might replace it arbitrarily many times in between.
 	if payloadAttributes != nil {
+		fmt.Printf("before getSealings: \n")
+		spew.Dump(payloadAttributes.TimelockPrivatekey)
 		// Create an empty block first which can be used as a fallback
 		empty, err := api.eth.Miner().GetSealingBlockSync(update.HeadBlockHash, payloadAttributes.Timestamp, payloadAttributes.SuggestedFeeRecipient, payloadAttributes.Random, true, payloadAttributes.TimelockPrivatekey)
 		if err != nil {
@@ -352,11 +350,15 @@ func (api *ConsensusAPI) GetPayloadV1(payloadID beacon.PayloadID) (*beacon.Execu
 	if data == nil {
 		return nil, beacon.UnknownPayload
 	}
+	fmt.Printf("GetPaylload res:\n")
+	spew.Dump(data.TimelockPrivatekey)
 	return data, nil
 }
 
 // NewPayloadV1 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
 func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
+	fmt.Printf("newPayload params: \n")
+	spew.Dump(params)
 	log.Trace("Engine API request received", "method", "ExecutePayload", "number", params.Number, "hash", params.BlockHash)
 	block, err := beacon.ExecutableDataToBlock(params)
 	if err != nil {

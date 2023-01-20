@@ -26,44 +26,14 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 )
 
-//go:generate go run github.com/fjl/gencodec -type RSAPublicKey -field-override rsaPublicKeyMarshaling -out gen_pubkey.go
-
-type RSAPublicKey struct {
-	N []byte `json:"n"     gencodec:"required"`
-	E uint64 `json:"e"     gencodec:"required"`
-}
-
-//go:generate go run github.com/fjl/gencodec -type RSAPrivateKey -field-override rsaPrivateKeyMarshaling -out gen_prvkey.go
-
-type RSAPrivateKey struct {
-	PublicKey *RSAPublicKey `json:"publicKey"     gencodec:"required"`
-	D         []byte        `json:"d"             gencodec:"required"`
-	Primes    [][]byte      `json:"primes"        gencodec:"required"`
-}
-
 //go:generate go run github.com/fjl/gencodec -type PayloadAttributesV1 -field-override payloadAttributesMarshaling -out gen_blockparams.go
 
 // PayloadAttributesV1 structure described at https://github.com/ethereum/execution-apis/pull/74
 type PayloadAttributesV1 struct {
-	Timestamp             uint64         `json:"timestamp"              gencodec:"required"`
-	Random                common.Hash    `json:"prevRandao"             gencodec:"required"`
-	SuggestedFeeRecipient common.Address `json:"suggestedFeeRecipient"  gencodec:"required"`
-	//D                     []byte         `json:"d" gencodec:"required"`
-	//Primes                [][]byte       `json:"primes" gencodec:"required"`
-	TimelockPrivatekey *RSAPrivateKey `json:"timelockPrivatekey"`
-}
-
-// JSON type overrides for RSAPublicKey.
-type rsaPublicKeyMarshaling struct {
-	N hexutil.Bytes  `json:"n"     gencodec:"required"`
-	E hexutil.Uint64 `json:"e"     gencodec:"required"`
-}
-
-// JSON type overrides for RSAPrivateKey.
-type rsaPrivateKeyMarshaling struct {
-	PublicKey *RSAPublicKey   `json:"publicKey"     gencodec:"required"`
-	D         hexutil.Bytes   `json:"d" gencodec:"required"`
-	Primes    []hexutil.Bytes `json:"primes" gencodec:"required"`
+	Timestamp             uint64               `json:"timestamp"              gencodec:"required"`
+	Random                common.Hash          `json:"prevRandao"             gencodec:"required"`
+	SuggestedFeeRecipient common.Address       `json:"suggestedFeeRecipient"  gencodec:"required"`
+	TimelockPrivatekey    *types.RSAPrivateKey `json:"timelockPrivatekey"`
 }
 
 // JSON type overrides for PayloadAttributesV1.
@@ -75,20 +45,21 @@ type payloadAttributesMarshaling struct {
 
 // ExecutableDataV1 structure described at https://github.com/ethereum/execution-apis/tree/main/src/engine/specification.md
 type ExecutableDataV1 struct {
-	ParentHash    common.Hash    `json:"parentHash"    gencodec:"required"`
-	FeeRecipient  common.Address `json:"feeRecipient"  gencodec:"required"`
-	StateRoot     common.Hash    `json:"stateRoot"     gencodec:"required"`
-	ReceiptsRoot  common.Hash    `json:"receiptsRoot"  gencodec:"required"`
-	LogsBloom     []byte         `json:"logsBloom"     gencodec:"required"`
-	Random        common.Hash    `json:"prevRandao"    gencodec:"required"`
-	Number        uint64         `json:"blockNumber"   gencodec:"required"`
-	GasLimit      uint64         `json:"gasLimit"      gencodec:"required"`
-	GasUsed       uint64         `json:"gasUsed"       gencodec:"required"`
-	Timestamp     uint64         `json:"timestamp"     gencodec:"required"`
-	ExtraData     []byte         `json:"extraData"     gencodec:"required"`
-	BaseFeePerGas *big.Int       `json:"baseFeePerGas" gencodec:"required"`
-	BlockHash     common.Hash    `json:"blockHash"     gencodec:"required"`
-	Transactions  [][]byte       `json:"transactions"  gencodec:"required"`
+	ParentHash         common.Hash          `json:"parentHash"    gencodec:"required"`
+	FeeRecipient       common.Address       `json:"feeRecipient"  gencodec:"required"`
+	StateRoot          common.Hash          `json:"stateRoot"     gencodec:"required"`
+	ReceiptsRoot       common.Hash          `json:"receiptsRoot"  gencodec:"required"`
+	LogsBloom          []byte               `json:"logsBloom"     gencodec:"required"`
+	Random             common.Hash          `json:"prevRandao"    gencodec:"required"`
+	Number             uint64               `json:"blockNumber"   gencodec:"required"`
+	GasLimit           uint64               `json:"gasLimit"      gencodec:"required"`
+	GasUsed            uint64               `json:"gasUsed"       gencodec:"required"`
+	Timestamp          uint64               `json:"timestamp"     gencodec:"required"`
+	ExtraData          []byte               `json:"extraData"     gencodec:"required"`
+	BaseFeePerGas      *big.Int             `json:"baseFeePerGas" gencodec:"required"`
+	BlockHash          common.Hash          `json:"blockHash"     gencodec:"required"`
+	Transactions       [][]byte             `json:"transactions"  gencodec:"required"`
+	TimelockPrivatekey *types.RSAPrivateKey `json:"timelockPrivatekey"`
 }
 
 // JSON type overrides for executableData.
@@ -189,21 +160,22 @@ func ExecutableDataToBlock(params ExecutableDataV1) (*types.Block, error) {
 		return nil, fmt.Errorf("invalid baseFeePerGas: %v", params.BaseFeePerGas)
 	}
 	header := &types.Header{
-		ParentHash:  params.ParentHash,
-		UncleHash:   types.EmptyUncleHash,
-		Coinbase:    params.FeeRecipient,
-		Root:        params.StateRoot,
-		TxHash:      types.DeriveSha(types.Transactions(txs), trie.NewStackTrie(nil)),
-		ReceiptHash: params.ReceiptsRoot,
-		Bloom:       types.BytesToBloom(params.LogsBloom),
-		Difficulty:  common.Big0,
-		Number:      new(big.Int).SetUint64(params.Number),
-		GasLimit:    params.GasLimit,
-		GasUsed:     params.GasUsed,
-		Time:        params.Timestamp,
-		BaseFee:     params.BaseFeePerGas,
-		Extra:       params.ExtraData,
-		MixDigest:   params.Random,
+		ParentHash:         params.ParentHash,
+		UncleHash:          types.EmptyUncleHash,
+		Coinbase:           params.FeeRecipient,
+		Root:               params.StateRoot,
+		TxHash:             types.DeriveSha(types.Transactions(txs), trie.NewStackTrie(nil)),
+		ReceiptHash:        params.ReceiptsRoot,
+		Bloom:              types.BytesToBloom(params.LogsBloom),
+		Difficulty:         common.Big0,
+		Number:             new(big.Int).SetUint64(params.Number),
+		GasLimit:           params.GasLimit,
+		GasUsed:            params.GasUsed,
+		Time:               params.Timestamp,
+		BaseFee:            params.BaseFeePerGas,
+		Extra:              params.ExtraData,
+		MixDigest:          params.Random,
+		TimelockPrivatekey: params.TimelockPrivatekey,
 	}
 	block := types.NewBlockWithHeader(header).WithBody(txs, nil /* uncles */)
 	if block.Hash() != params.BlockHash {
@@ -216,19 +188,20 @@ func ExecutableDataToBlock(params ExecutableDataV1) (*types.Block, error) {
 // fields from the given block. It assumes the given block is post-merge block.
 func BlockToExecutableData(block *types.Block) *ExecutableDataV1 {
 	return &ExecutableDataV1{
-		BlockHash:     block.Hash(),
-		ParentHash:    block.ParentHash(),
-		FeeRecipient:  block.Coinbase(),
-		StateRoot:     block.Root(),
-		Number:        block.NumberU64(),
-		GasLimit:      block.GasLimit(),
-		GasUsed:       block.GasUsed(),
-		BaseFeePerGas: block.BaseFee(),
-		Timestamp:     block.Time(),
-		ReceiptsRoot:  block.ReceiptHash(),
-		LogsBloom:     block.Bloom().Bytes(),
-		Transactions:  encodeTransactions(block.Transactions()),
-		Random:        block.MixDigest(),
-		ExtraData:     block.Extra(),
+		BlockHash:          block.Hash(),
+		ParentHash:         block.ParentHash(),
+		FeeRecipient:       block.Coinbase(),
+		StateRoot:          block.Root(),
+		Number:             block.NumberU64(),
+		GasLimit:           block.GasLimit(),
+		GasUsed:            block.GasUsed(),
+		BaseFeePerGas:      block.BaseFee(),
+		Timestamp:          block.Time(),
+		ReceiptsRoot:       block.ReceiptHash(),
+		LogsBloom:          block.Bloom().Bytes(),
+		Transactions:       encodeTransactions(block.Transactions()),
+		Random:             block.MixDigest(),
+		ExtraData:          block.Extra(),
+		TimelockPrivatekey: block.TimelockPrivatekey(),
 	}
 }

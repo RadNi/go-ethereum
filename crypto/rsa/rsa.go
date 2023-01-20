@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/core/types"
 	"math/big"
 	"os"
 
@@ -128,8 +129,19 @@ func ImportPrivateKey() *rsa.PrivateKey {
 	return prv
 }
 
-func NewPublicKey() {
+func FromProtoRSAPrivatekey(prv *types.RSAPrivateKey) *rsa.PrivateKey {
+	return NewPrivateKey(prv.D, prv.Primes, prv.PublicKey.N, prv.PublicKey.E)
+}
 
+func FromProtoRSAPublickey(pub *types.RSAPublicKey) *rsa.PublicKey {
+	return NewPublicKey(pub.N, pub.E)
+}
+
+func NewPublicKey(n []byte, e uint64) *rsa.PublicKey {
+	return &rsa.PublicKey{
+		N: new(big.Int).SetBytes(n),
+		E: int(e),
+	}
 }
 
 func NewPrivateKey(d []byte, p [][]byte, n []byte, e uint64) *rsa.PrivateKey {
@@ -186,7 +198,8 @@ func Encrypt(message []byte, pk *rsa.PublicKey) ([]byte, error) {
 	return ciphertext, nil
 }
 
-func Decrypt(ciphertext []byte, sk *rsa.PrivateKey) ([]byte, error) {
+func Decrypt(ciphertext []byte, skt *types.RSAPrivateKey) ([]byte, error) {
+	sk := FromProtoRSAPrivatekey(skt)
 	rng := rand.Reader
 	label := []byte("orders")
 	plaintext, err := rsa.DecryptOAEP(sha256.New(), rng, sk, ciphertext, label)
@@ -219,9 +232,9 @@ func EncryptMulti(msg []byte, pk *rsa.PublicKey) ([]byte, error) {
 	return encryptedBytes, nil
 }
 
-func DecryptMulti(ciphertext []byte, sk *rsa.PrivateKey) ([]byte, error) {
+func DecryptMulti(ciphertext []byte, sk *types.RSAPrivateKey) ([]byte, error) {
 	msgLen := len(ciphertext)
-	step := sk.PublicKey.Size()
+	step := FromProtoRSAPublickey(sk.PublicKey).Size()
 	var decryptedBytes []byte
 
 	for start := 0; start < msgLen; start += step {
