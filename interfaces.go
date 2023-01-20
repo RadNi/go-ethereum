@@ -19,7 +19,6 @@ package ethereum
 
 import (
 	"context"
-	"crypto/rsa"
 	"errors"
 	"math/big"
 
@@ -146,7 +145,7 @@ type CallMsg struct {
 	AccessList types.AccessList // EIP-2930 access list.
 
 	Type       byte
-	PrivateKey *rsa.PrivateKey
+	PrivateKey *types.RSAPrivateKey
 }
 
 func (m CallMsg) UpdateData(new []byte)        { m.Data = new }

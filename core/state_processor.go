@@ -17,10 +17,7 @@
 package core
 
 import (
-	brsa "crypto/rsa"
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/beacon"
-	"github.com/ethereum/go-ethereum/crypto/rsa"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -111,8 +108,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 				return nil, nil, 0, fmt.Errorf("after the transition, tx of Normal type is not allowed tx %d [%v]", i, tx.Hash().Hex())
 			}
 		}
-		prv := rsa.ImportPrivateKey()
-		msg, err := tx.AsMessage(types.MakeSigner(p.config, header.Number), header.BaseFee, prv)
+		msg, err := tx.AsMessage(types.MakeSigner(p.config, header.Number), header.BaseFee, header.TimelockPrivatekey)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
@@ -182,15 +178,8 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, author *com
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config, prv *beacon.RSAPrivateKey) (*types.Receipt, error) {
-	log.Info("nakone ine?")
-	var privateKey *brsa.PrivateKey
-	if prv == nil {
-		privateKey = nil
-	} else {
-		privateKey = rsa.NewPrivateKey(prv.D, prv.Primes, prv.PublicKey.N, prv.PublicKey.E)
-	}
-	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number), header.BaseFee, privateKey)
+func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config, prv *types.RSAPrivateKey) (*types.Receipt, error) {
+	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number), header.BaseFee, prv)
 	if err != nil {
 		return nil, err
 	}

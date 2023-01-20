@@ -19,7 +19,6 @@ package types
 import (
 	"bytes"
 	"container/heap"
-	"crypto/rsa"
 	"errors"
 	"io"
 	"math/big"
@@ -615,10 +614,10 @@ type Message struct {
 	accessList AccessList
 	isFake     bool
 	txType     byte
-	privateKey *rsa.PrivateKey
+	privateKey *RSAPrivateKey
 }
 
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool, mode byte, prv *rsa.PrivateKey, txTypes ...byte) Message {
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool, mode byte, prv *RSAPrivateKey, txTypes ...byte) Message {
 	if len(txTypes) == 1 {
 		return Message{
 			mode:       mode,
@@ -657,7 +656,7 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 }
 
 // AsMessage returns the transaction as a core.Message.
-func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int, prv *rsa.PrivateKey) (Message, error) {
+func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int, prv *RSAPrivateKey) (Message, error) {
 	msg := Message{
 		mode:       tx.Mode(),
 		nonce:      tx.Nonce(),
@@ -697,7 +696,7 @@ func (m Message) UpdateData(new []byte)        { m.data = new }
 func (m Message) UpdateTo(new *common.Address) { m.to = new }
 func (m Message) Type() byte                   { return m.txType }
 func (m Message) Mode() byte                   { return m.mode }
-func (m Message) PrivateKey() *rsa.PrivateKey  { return m.privateKey }
+func (m Message) PrivateKey() *RSAPrivateKey   { return m.privateKey }
 
 // copyAddressPtr copies an address.
 func copyAddressPtr(a *common.Address) *common.Address {

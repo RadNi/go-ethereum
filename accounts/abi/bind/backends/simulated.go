@@ -18,7 +18,6 @@ package backends
 
 import (
 	"context"
-	"crypto/rsa"
 	"errors"
 	"fmt"
 	"math/big"
@@ -831,8 +830,8 @@ func (m callMsg) AccessList() types.AccessList { return m.CallMsg.AccessList }
 
 // func (m callMsg) UpdateData(new []byte)  	   { m.CallMsg.UpdateData }
 // func (m callMsg) UpdateTo(new *common.Address) { m.CallMsg.UpdateTo }
-func (m callMsg) Type() byte                  { return m.CallMsg.Type }
-func (m callMsg) PrivateKey() *rsa.PrivateKey { return m.CallMsg.PrivateKey }
+func (m callMsg) Type() byte                       { return m.CallMsg.Type }
+func (m callMsg) PrivateKey() *types.RSAPrivateKey { return m.CallMsg.PrivateKey }
 
 // filterBackend implements filters.Backend to support filtering for logs without
 // taking bloom-bits acceleration structures into account.
