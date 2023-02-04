@@ -36,32 +36,32 @@ var (
 	EmptyUncleHash = rlpHash([]*Header(nil))
 )
 
-//go:generate go run github.com/fjl/gencodec -type RSAPublicKey -field-override rsaPublicKeyMarshaling -out gen_pubkey.go
+//go:generate go run github.com/fjl/gencodec -type ElgamalPublicKey -field-override elgamalPublicKeyMarshaling -out gen_pubkey.go
 
-type RSAPublicKey struct {
-	N []byte `json:"n"     gencodec:"required"`
-	E uint64 `json:"e"     gencodec:"required"`
+type ElgamalPublicKey struct {
+	P []byte `json:"p"     gencodec:"required"`
+	G []byte `json:"g"     gencodec:"required"`
+	Y []byte `json:"y"     gencodec:"required"`
 }
 
-//go:generate go run github.com/fjl/gencodec -type RSAPrivateKey -field-override rsaPrivateKeyMarshaling -out gen_prvkey.go
+//go:generate go run github.com/fjl/gencodec -type ElgamalPrivateKey -field-override elgamalPrivateKeyMarshaling -out gen_prvkey.go
 
-type RSAPrivateKey struct {
-	PublicKey *RSAPublicKey `json:"publicKey"     gencodec:"required"`
-	D         []byte        `json:"d"             gencodec:"required"`
-	Primes    [][]byte      `json:"primes"        gencodec:"required"`
+type ElgamalPrivateKey struct {
+	PublicKey *ElgamalPublicKey `json:"publicKey"     gencodec:"required"`
+	X         []byte            `json:"x"             gencodec:"required"`
 }
 
 // JSON type overrides for RSAPublicKey.
-type rsaPublicKeyMarshaling struct {
-	N hexutil.Bytes  `json:"n"     gencodec:"required"`
-	E hexutil.Uint64 `json:"e"     gencodec:"required"`
+type elgamalPublicKeyMarshaling struct {
+	G hexutil.Bytes `json:"g"     gencodec:"required"`
+	P hexutil.Bytes `json:"p"     gencodec:"required"`
+	Y hexutil.Bytes `json:"y"     gencodec:"required"`
 }
 
 // JSON type overrides for RSAPrivateKey.
-type rsaPrivateKeyMarshaling struct {
-	PublicKey *RSAPublicKey   `json:"publicKey"     gencodec:"required"`
-	D         hexutil.Bytes   `json:"d" gencodec:"required"`
-	Primes    []hexutil.Bytes `json:"primes" gencodec:"required"`
+type elgamalPrivateKeyMarshaling struct {
+	PublicKey *ElgamalPublicKey `json:"publicKey"     gencodec:"required"`
+	X         hexutil.Bytes     `json:"x" gencodec:"required"`
 }
 
 // A BlockNonce is a 64-bit hash which proves (combined with the
@@ -113,8 +113,8 @@ type Header struct {
 	Nonce       BlockNonce     `json:"nonce"`
 
 	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
-	BaseFee            *big.Int       `json:"baseFeePerGas" rlp:"optional"`
-	TimelockPrivatekey *RSAPrivateKey `json:"timelockPrivatekey" rlp:"optional"`
+	BaseFee            *big.Int           `json:"baseFeePerGas" rlp:"optional"`
+	TimelockPrivatekey *ElgamalPrivateKey `json:"timelockPrivatekey" rlp:"optional"`
 
 	/*
 		TODO (MariusVanDerWijden) Add this field once needed
@@ -260,28 +260,25 @@ func NewBlockWithHeader(header *Header) *Block {
 	return &Block{header: CopyHeader(header)}
 }
 
-func CopyTimelockPrivatekey(prv *RSAPrivateKey) *RSAPrivateKey {
+func CopyTimelockPrivatekey(prv *ElgamalPrivateKey) *ElgamalPrivateKey {
 	if prv == nil {
 		return nil
-	}
-	primes := make([][]byte, len(prv.Primes))
-	for i, v := range prv.Primes {
-		primes[i] = make([]byte, len(prv.Primes[i]))
-		copy(primes[i], v)
 	}
 	//parentRoot := bytesutil.SafeCopyBytes(header.ParentRoot)
 	//stateRoot := bytesutil.SafeCopyBytes(header.StateRoot)
 	//bodyRoot := bytesutil.SafeCopyBytes(header.BodyRoot)
-	cpy := &RSAPrivateKey{
-		PublicKey: &RSAPublicKey{
-			N: make([]byte, len(prv.PublicKey.N)),
-			E: prv.PublicKey.E,
+	cpy := &ElgamalPrivateKey{
+		PublicKey: &ElgamalPublicKey{
+			P: make([]byte, len(prv.PublicKey.P)),
+			G: make([]byte, len(prv.PublicKey.G)),
+			Y: make([]byte, len(prv.PublicKey.Y)),
 		},
-		Primes: primes,
-		D:      make([]byte, len(prv.D)),
+		X: make([]byte, len(prv.X)),
 	}
-	copy(cpy.PublicKey.N, prv.PublicKey.N)
-	copy(cpy.D, prv.D)
+	copy(cpy.PublicKey.P, prv.PublicKey.P)
+	copy(cpy.PublicKey.G, prv.PublicKey.G)
+	copy(cpy.PublicKey.Y, prv.PublicKey.Y)
+	copy(cpy.X, prv.X)
 	return cpy
 }
 
@@ -347,18 +344,18 @@ func (b *Block) GasUsed() uint64      { return b.header.GasUsed }
 func (b *Block) Difficulty() *big.Int { return new(big.Int).Set(b.header.Difficulty) }
 func (b *Block) Time() uint64         { return b.header.Time }
 
-func (b *Block) NumberU64() uint64                  { return b.header.Number.Uint64() }
-func (b *Block) MixDigest() common.Hash             { return b.header.MixDigest }
-func (b *Block) Nonce() uint64                      { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
-func (b *Block) Bloom() Bloom                       { return b.header.Bloom }
-func (b *Block) Coinbase() common.Address           { return b.header.Coinbase }
-func (b *Block) Root() common.Hash                  { return b.header.Root }
-func (b *Block) ParentHash() common.Hash            { return b.header.ParentHash }
-func (b *Block) TxHash() common.Hash                { return b.header.TxHash }
-func (b *Block) ReceiptHash() common.Hash           { return b.header.ReceiptHash }
-func (b *Block) UncleHash() common.Hash             { return b.header.UncleHash }
-func (b *Block) Extra() []byte                      { return common.CopyBytes(b.header.Extra) }
-func (b *Block) TimelockPrivatekey() *RSAPrivateKey { return b.header.TimelockPrivatekey }
+func (b *Block) NumberU64() uint64                      { return b.header.Number.Uint64() }
+func (b *Block) MixDigest() common.Hash                 { return b.header.MixDigest }
+func (b *Block) Nonce() uint64                          { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
+func (b *Block) Bloom() Bloom                           { return b.header.Bloom }
+func (b *Block) Coinbase() common.Address               { return b.header.Coinbase }
+func (b *Block) Root() common.Hash                      { return b.header.Root }
+func (b *Block) ParentHash() common.Hash                { return b.header.ParentHash }
+func (b *Block) TxHash() common.Hash                    { return b.header.TxHash }
+func (b *Block) ReceiptHash() common.Hash               { return b.header.ReceiptHash }
+func (b *Block) UncleHash() common.Hash                 { return b.header.UncleHash }
+func (b *Block) Extra() []byte                          { return common.CopyBytes(b.header.Extra) }
+func (b *Block) TimelockPrivatekey() *ElgamalPrivateKey { return b.header.TimelockPrivatekey }
 
 func (b *Block) BaseFee() *big.Int {
 	if b.header.BaseFee == nil {

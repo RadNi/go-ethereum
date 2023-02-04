@@ -19,7 +19,7 @@ func (p PayloadAttributesV1) MarshalJSON() ([]byte, error) {
 		Timestamp             hexutil.Uint64       `json:"timestamp"              gencodec:"required"`
 		Random                common.Hash          `json:"prevRandao"             gencodec:"required"`
 		SuggestedFeeRecipient common.Address       `json:"suggestedFeeRecipient"  gencodec:"required"`
-		TimelockPrivatekey    *types.RSAPrivateKey `json:"timelockPrivatekey"`
+		TimelockPrivatekey    *types.ElgamalPrivateKey `json:"timelockPrivatekey"`
 	}
 	var enc PayloadAttributesV1
 	enc.Timestamp = hexutil.Uint64(p.Timestamp)
@@ -35,7 +35,7 @@ func (p *PayloadAttributesV1) UnmarshalJSON(input []byte) error {
 		Timestamp             *hexutil.Uint64      `json:"timestamp"              gencodec:"required"`
 		Random                *common.Hash         `json:"prevRandao"             gencodec:"required"`
 		SuggestedFeeRecipient *common.Address      `json:"suggestedFeeRecipient"  gencodec:"required"`
-		TimelockPrivatekey    *types.RSAPrivateKey `json:"timelockPrivatekey"`
+		TimelockPrivatekey    *types.ElgamalPrivateKey `json:"timelockPrivatekey"`
 	}
 	var dec PayloadAttributesV1
 	if err := json.Unmarshal(input, &dec); err != nil {

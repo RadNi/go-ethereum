@@ -614,10 +614,10 @@ type Message struct {
 	accessList AccessList
 	isFake     bool
 	txType     byte
-	privateKey *RSAPrivateKey
+	privateKey *ElgamalPrivateKey
 }
 
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool, mode byte, prv *RSAPrivateKey, txTypes ...byte) Message {
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool, mode byte, prv *ElgamalPrivateKey, txTypes ...byte) Message {
 	if len(txTypes) == 1 {
 		return Message{
 			mode:       mode,
@@ -656,7 +656,7 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 }
 
 // AsMessage returns the transaction as a core.Message.
-func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int, prv *RSAPrivateKey) (Message, error) {
+func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int, prv *ElgamalPrivateKey) (Message, error) {
 	msg := Message{
 		mode:       tx.Mode(),
 		nonce:      tx.Nonce(),
@@ -681,22 +681,22 @@ func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int, prv *RSAPrivateKey)
 	return msg, err
 }
 
-func (m Message) From() common.Address         { return m.from }
-func (m Message) To() *common.Address          { return m.to }
-func (m Message) GasPrice() *big.Int           { return m.gasPrice }
-func (m Message) GasFeeCap() *big.Int          { return m.gasFeeCap }
-func (m Message) GasTipCap() *big.Int          { return m.gasTipCap }
-func (m Message) Value() *big.Int              { return m.amount }
-func (m Message) Gas() uint64                  { return m.gasLimit }
-func (m Message) Nonce() uint64                { return m.nonce }
-func (m Message) Data() []byte                 { return m.data }
-func (m Message) AccessList() AccessList       { return m.accessList }
-func (m Message) IsFake() bool                 { return m.isFake }
-func (m Message) UpdateData(new []byte)        { m.data = new }
-func (m Message) UpdateTo(new *common.Address) { m.to = new }
-func (m Message) Type() byte                   { return m.txType }
-func (m Message) Mode() byte                   { return m.mode }
-func (m Message) PrivateKey() *RSAPrivateKey   { return m.privateKey }
+func (m Message) From() common.Address           { return m.from }
+func (m Message) To() *common.Address            { return m.to }
+func (m Message) GasPrice() *big.Int             { return m.gasPrice }
+func (m Message) GasFeeCap() *big.Int            { return m.gasFeeCap }
+func (m Message) GasTipCap() *big.Int            { return m.gasTipCap }
+func (m Message) Value() *big.Int                { return m.amount }
+func (m Message) Gas() uint64                    { return m.gasLimit }
+func (m Message) Nonce() uint64                  { return m.nonce }
+func (m Message) Data() []byte                   { return m.data }
+func (m Message) AccessList() AccessList         { return m.accessList }
+func (m Message) IsFake() bool                   { return m.isFake }
+func (m Message) UpdateData(new []byte)          { m.data = new }
+func (m Message) UpdateTo(new *common.Address)   { m.to = new }
+func (m Message) Type() byte                     { return m.txType }
+func (m Message) Mode() byte                     { return m.mode }
+func (m Message) PrivateKey() *ElgamalPrivateKey { return m.privateKey }
 
 // copyAddressPtr copies an address.
 func copyAddressPtr(a *common.Address) *common.Address {
