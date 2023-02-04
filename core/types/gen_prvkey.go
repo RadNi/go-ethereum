@@ -9,52 +9,37 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
-var _ = (*rsaPrivateKeyMarshaling)(nil)
+var _ = (*elgamalPrivateKeyMarshaling)(nil)
 
 // MarshalJSON marshals as JSON.
-func (r RSAPrivateKey) MarshalJSON() ([]byte, error) {
-	type RSAPrivateKey struct {
-		PublicKey *RSAPublicKey   `json:"publicKey"     gencodec:"required"`
-		D         hexutil.Bytes   `json:"d"             gencodec:"required"`
-		Primes    []hexutil.Bytes `json:"primes"        gencodec:"required"`
+func (e ElgamalPrivateKey) MarshalJSON() ([]byte, error) {
+	type ElgamalPrivateKey struct {
+		PublicKey *ElgamalPublicKey `json:"publicKey"     gencodec:"required"`
+		X         hexutil.Bytes     `json:"x"             gencodec:"required"`
 	}
-	var enc RSAPrivateKey
-	enc.PublicKey = r.PublicKey
-	enc.D = r.D
-	if r.Primes != nil {
-		enc.Primes = make([]hexutil.Bytes, len(r.Primes))
-		for k, v := range r.Primes {
-			enc.Primes[k] = v
-		}
-	}
+	var enc ElgamalPrivateKey
+	enc.PublicKey = e.PublicKey
+	enc.X = e.X
 	return json.Marshal(&enc)
 }
 
 // UnmarshalJSON unmarshals from JSON.
-func (r *RSAPrivateKey) UnmarshalJSON(input []byte) error {
-	type RSAPrivateKey struct {
-		PublicKey *RSAPublicKey   `json:"publicKey"     gencodec:"required"`
-		D         *hexutil.Bytes  `json:"d"             gencodec:"required"`
-		Primes    []hexutil.Bytes `json:"primes"        gencodec:"required"`
+func (e *ElgamalPrivateKey) UnmarshalJSON(input []byte) error {
+	type ElgamalPrivateKey struct {
+		PublicKey *ElgamalPublicKey `json:"publicKey"     gencodec:"required"`
+		X         *hexutil.Bytes    `json:"x"             gencodec:"required"`
 	}
-	var dec RSAPrivateKey
+	var dec ElgamalPrivateKey
 	if err := json.Unmarshal(input, &dec); err != nil {
 		return err
 	}
 	if dec.PublicKey == nil {
-		return errors.New("missing required field 'publicKey' for RSAPrivateKey")
+		return errors.New("missing required field 'publicKey' for ElgamalPrivateKey")
 	}
-	r.PublicKey = dec.PublicKey
-	if dec.D == nil {
-		return errors.New("missing required field 'd' for RSAPrivateKey")
+	e.PublicKey = dec.PublicKey
+	if dec.X == nil {
+		return errors.New("missing required field 'x' for ElgamalPrivateKey")
 	}
-	r.D = *dec.D
-	if dec.Primes == nil {
-		return errors.New("missing required field 'primes' for RSAPrivateKey")
-	}
-	r.Primes = make([][]byte, len(dec.Primes))
-	for k, v := range dec.Primes {
-		r.Primes[k] = v
-	}
+	e.X = *dec.X
 	return nil
 }

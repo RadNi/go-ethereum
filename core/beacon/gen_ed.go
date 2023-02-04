@@ -31,7 +31,7 @@ func (e ExecutableDataV1) MarshalJSON() ([]byte, error) {
 		BaseFeePerGas      *hexutil.Big         `json:"baseFeePerGas" gencodec:"required"`
 		BlockHash          common.Hash          `json:"blockHash"     gencodec:"required"`
 		Transactions       []hexutil.Bytes      `json:"transactions"  gencodec:"required"`
-		TimelockPrivatekey *types.RSAPrivateKey `json:"timelockPrivatekey"`
+		TimelockPrivatekey *types.ElgamalPrivateKey `json:"timelockPrivatekey"`
 	}
 	var enc ExecutableDataV1
 	enc.ParentHash = e.ParentHash
@@ -74,7 +74,7 @@ func (e *ExecutableDataV1) UnmarshalJSON(input []byte) error {
 		BaseFeePerGas      *hexutil.Big         `json:"baseFeePerGas" gencodec:"required"`
 		BlockHash          *common.Hash         `json:"blockHash"     gencodec:"required"`
 		Transactions       []hexutil.Bytes      `json:"transactions"  gencodec:"required"`
-		TimelockPrivatekey *types.RSAPrivateKey `json:"timelockPrivatekey"`
+		TimelockPrivatekey *types.ElgamalPrivateKey `json:"timelockPrivatekey"`
 	}
 	var dec ExecutableDataV1
 	if err := json.Unmarshal(input, &dec); err != nil {

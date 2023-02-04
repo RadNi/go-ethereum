@@ -145,7 +145,7 @@ type CallMsg struct {
 	AccessList types.AccessList // EIP-2930 access list.
 
 	Type       byte
-	PrivateKey *types.RSAPrivateKey
+	PrivateKey *types.ElgamalPrivateKey
 }
 
 func (m CallMsg) UpdateData(new []byte)        { m.Data = new }

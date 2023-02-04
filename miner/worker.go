@@ -99,7 +99,7 @@ type environment struct {
 	txs                []*types.Transaction
 	receipts           []*types.Receipt
 	uncles             map[common.Hash]*types.Header
-	timelockPrivateKey *types.RSAPrivateKey
+	timelockPrivateKey *types.ElgamalPrivateKey
 }
 
 // copy creates a deep copy of environment.
@@ -760,7 +760,7 @@ func (w *worker) resultLoop() {
 }
 
 // makeEnv creates a new environment for the sealing block.
-func (w *worker) makeEnv(parent *types.Block, header *types.Header, coinbase common.Address, timelockPrivateKey *types.RSAPrivateKey) (*environment, error) {
+func (w *worker) makeEnv(parent *types.Block, header *types.Header, coinbase common.Address, timelockPrivateKey *types.ElgamalPrivateKey) (*environment, error) {
 	// Retrieve the parent state to execute on top and start a prefetcher for
 	// the miner to speed block sealing up a bit.
 	state, err := w.chain.StateAt(parent.Root())
@@ -1075,7 +1075,7 @@ type generateParams struct {
 	noUncle            bool           // Flag whether the uncle block inclusion is allowed
 	noExtra            bool           // Flag whether the extra field assignment is allowed
 	noTxs              bool           // Flag whether an empty block without any transaction is expected
-	timelockPrivateKey *types.RSAPrivateKey
+	timelockPrivateKey *types.ElgamalPrivateKey
 }
 
 // prepareWork constructs the sealing task according to the given parameters,
@@ -1318,7 +1318,7 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 // getSealingBlock generates the sealing block based on the given parameters.
 // The generation result will be passed back via the given channel no matter
 // the generation itself succeeds or not.
-func (w *worker) getSealingBlock(parent common.Hash, timestamp uint64, coinbase common.Address, random common.Hash, noTxs bool, timelockPrivateKey *types.RSAPrivateKey) (chan *types.Block, chan error, error) {
+func (w *worker) getSealingBlock(parent common.Hash, timestamp uint64, coinbase common.Address, random common.Hash, noTxs bool, timelockPrivateKey *types.ElgamalPrivateKey) (chan *types.Block, chan error, error) {
 	var (
 		resCh = make(chan *types.Block, 1)
 		errCh = make(chan error, 1)
@@ -1363,7 +1363,7 @@ func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
 	return result
 }
 
-func copyRSAPrivateKey(prvKey *types.RSAPrivateKey) *types.RSAPrivateKey {
+func copyRSAPrivateKey(prvKey *types.ElgamalPrivateKey) *types.ElgamalPrivateKey {
 	N := &prvKey
 	return *N
 }

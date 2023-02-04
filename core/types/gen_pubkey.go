@@ -9,37 +9,44 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
-var _ = (*rsaPublicKeyMarshaling)(nil)
+var _ = (*elgamalPublicKeyMarshaling)(nil)
 
 // MarshalJSON marshals as JSON.
-func (r RSAPublicKey) MarshalJSON() ([]byte, error) {
-	type RSAPublicKey struct {
-		N hexutil.Bytes  `json:"n"     gencodec:"required"`
-		E hexutil.Uint64 `json:"e"     gencodec:"required"`
+func (e ElgamalPublicKey) MarshalJSON() ([]byte, error) {
+	type ElgamalPublicKey struct {
+		P hexutil.Bytes `json:"p"     gencodec:"required"`
+		G hexutil.Bytes `json:"g"     gencodec:"required"`
+		Y hexutil.Bytes `json:"y"     gencodec:"required"`
 	}
-	var enc RSAPublicKey
-	enc.N = r.N
-	enc.E = hexutil.Uint64(r.E)
+	var enc ElgamalPublicKey
+	enc.P = e.P
+	enc.G = e.G
+	enc.Y = e.Y
 	return json.Marshal(&enc)
 }
 
 // UnmarshalJSON unmarshals from JSON.
-func (r *RSAPublicKey) UnmarshalJSON(input []byte) error {
-	type RSAPublicKey struct {
-		N *hexutil.Bytes  `json:"n"     gencodec:"required"`
-		E *hexutil.Uint64 `json:"e"     gencodec:"required"`
+func (e *ElgamalPublicKey) UnmarshalJSON(input []byte) error {
+	type ElgamalPublicKey struct {
+		P *hexutil.Bytes `json:"p"     gencodec:"required"`
+		G *hexutil.Bytes `json:"g"     gencodec:"required"`
+		Y *hexutil.Bytes `json:"y"     gencodec:"required"`
 	}
-	var dec RSAPublicKey
+	var dec ElgamalPublicKey
 	if err := json.Unmarshal(input, &dec); err != nil {
 		return err
 	}
-	if dec.N == nil {
-		return errors.New("missing required field 'n' for RSAPublicKey")
+	if dec.P == nil {
+		return errors.New("missing required field 'p' for ElgamalPublicKey")
 	}
-	r.N = *dec.N
-	if dec.E == nil {
-		return errors.New("missing required field 'e' for RSAPublicKey")
+	e.P = *dec.P
+	if dec.G == nil {
+		return errors.New("missing required field 'g' for ElgamalPublicKey")
 	}
-	r.E = uint64(*dec.E)
+	e.G = *dec.G
+	if dec.Y == nil {
+		return errors.New("missing required field 'y' for ElgamalPublicKey")
+	}
+	e.Y = *dec.Y
 	return nil
 }

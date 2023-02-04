@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto/elgamal"
 	"math/big"
 	"strings"
 	"time"
@@ -39,7 +40,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/rsa"
 	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -732,10 +732,10 @@ func (s *BlockChainAPI) GetHeaderByHash(ctx context.Context, hash common.Hash) m
 }
 
 // GetBlockByNumber returns the requested canonical block.
-// * When blockNr is -1 the chain head is returned.
-// * When blockNr is -2 the pending chain head is returned.
-// * When fullTx is true all transactions in the block are returned, otherwise
-//   only the transaction hash is returned.
+//   - When blockNr is -1 the chain head is returned.
+//   - When blockNr is -2 the pending chain head is returned.
+//   - When fullTx is true all transactions in the block are returned, otherwise
+//     only the transaction hash is returned.
 func (s *BlockChainAPI) GetBlockByNumber(ctx context.Context, number rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.BlockByNumber(ctx, number)
 	if block != nil && err == nil {
@@ -1707,24 +1707,24 @@ func (s *TransactionAPI) SendTransaction(ctx context.Context, args TransactionAr
 	}
 
 	//if *args.To == common.HexToAddress("0xaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeea") {
-		pub := rsa.ImportPublicKey()
-		var encrypted hexutil.Bytes
-		var e error
-		encrypted, e = rsa.EncryptMulti(args.data(), pub)
-		if e != nil {
-			return common.Hash{}, e
-		}
-		log.Info("radni: man injam1")
-		log.Info(encrypted.String())
-		args.Data = &encrypted
-		log.Info("radni: man injam2")
-		//encryptedToNotCropped := rsa.Encrypt(args.To.Bytes(), pub)
-		//encryptedTo := common.BytesToAddress(encryptedToNotCropped)
-		//args.To = &encryptedTo
-		log.Info("radni: man injam3")
-		log.Info(encrypted.String())
-		//log.Info((*args.To).Hex())
-		//fmt.Printf("Ciphertext: %x\n", encryptedToNotCropped)
+	pub := elgamal.ImportPublicKey()
+	var encrypted hexutil.Bytes
+	var e error
+	encrypted, e = elgamal.EncryptMulti(args.data(), pub)
+	if e != nil {
+		return common.Hash{}, e
+	}
+	log.Info("radni: man injam1")
+	log.Info(encrypted.String())
+	args.Data = &encrypted
+	log.Info("radni: man injam2")
+	//encryptedToNotCropped := rsa.Encrypt(args.To.Bytes(), pub)
+	//encryptedTo := common.BytesToAddress(encryptedToNotCropped)
+	//args.To = &encryptedTo
+	log.Info("radni: man injam3")
+	log.Info(encrypted.String())
+	//log.Info((*args.To).Hex())
+	//fmt.Printf("Ciphertext: %x\n", encryptedToNotCropped)
 	//}
 	// Assemble the transaction and sign with the wallet
 	args.Mode = types.Encrypted

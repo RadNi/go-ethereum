@@ -61,16 +61,12 @@ func (obj *Header) EncodeRLP(_w io.Writer) error {
 				w.Write([]byte{0xC0})
 			} else {
 				_tmp4 := w.List()
-				w.WriteBytes(obj.TimelockPrivatekey.PublicKey.N)
-				w.WriteUint64(obj.TimelockPrivatekey.PublicKey.E)
+				w.WriteBytes(obj.TimelockPrivatekey.PublicKey.P)
+				w.WriteBytes(obj.TimelockPrivatekey.PublicKey.G)
+				w.WriteBytes(obj.TimelockPrivatekey.PublicKey.Y)
 				w.ListEnd(_tmp4)
 			}
-			w.WriteBytes(obj.TimelockPrivatekey.D)
-			_tmp5 := w.List()
-			for _, _tmp6 := range obj.TimelockPrivatekey.Primes {
-				w.WriteBytes(_tmp6)
-			}
-			w.ListEnd(_tmp5)
+			w.WriteBytes(obj.TimelockPrivatekey.X)
 			w.ListEnd(_tmp3)
 		}
 	}
