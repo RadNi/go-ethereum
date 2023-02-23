@@ -32,6 +32,7 @@ func (h Header) MarshalJSON() ([]byte, error) {
 		MixDigest          common.Hash        `json:"mixHash"`
 		Nonce              BlockNonce         `json:"nonce"`
 		BaseFee            *hexutil.Big       `json:"baseFeePerGas" rlp:"optional"`
+		TimelockPublicKey  *ElgamalPublicKey  `json:"timelockPublickey" rlp:"optional"`
 		TimelockPrivatekey *ElgamalPrivateKey `json:"timelockPrivatekey" rlp:"optional"`
 		Hash               common.Hash        `json:"hash"`
 	}
@@ -52,6 +53,7 @@ func (h Header) MarshalJSON() ([]byte, error) {
 	enc.MixDigest = h.MixDigest
 	enc.Nonce = h.Nonce
 	enc.BaseFee = (*hexutil.Big)(h.BaseFee)
+	enc.TimelockPublicKey = h.TimelockPublicKey
 	enc.TimelockPrivatekey = h.TimelockPrivatekey
 	enc.Hash = h.Hash()
 	return json.Marshal(&enc)
@@ -76,6 +78,7 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 		MixDigest          *common.Hash       `json:"mixHash"`
 		Nonce              *BlockNonce        `json:"nonce"`
 		BaseFee            *hexutil.Big       `json:"baseFeePerGas" rlp:"optional"`
+		TimelockPublicKey  *ElgamalPublicKey  `json:"timelockPublickey" rlp:"optional"`
 		TimelockPrivatekey *ElgamalPrivateKey `json:"timelockPrivatekey" rlp:"optional"`
 	}
 	var dec Header
@@ -141,6 +144,9 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 	}
 	if dec.BaseFee != nil {
 		h.BaseFee = (*big.Int)(dec.BaseFee)
+	}
+	if dec.TimelockPublicKey != nil {
+		h.TimelockPublicKey = dec.TimelockPublicKey
 	}
 	if dec.TimelockPrivatekey != nil {
 		h.TimelockPrivatekey = dec.TimelockPrivatekey

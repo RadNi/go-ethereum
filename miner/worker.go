@@ -538,7 +538,8 @@ func (w *worker) mainLoop() {
 			w.commitWork(req.interrupt, req.noempty, req.timestamp)
 
 		case req := <-w.getWorkCh:
-			log.Info("getWorkCh")
+			log.Info("generating work")
+			fmt.Printf("pubKey: %v prvKey: %v\n", req.params.timelockPublicKey.Y, req.params.timelockPrivateKey.X)
 			block, err := w.generateWork(req.params)
 			if err != nil {
 				req.err <- err
@@ -1076,6 +1077,7 @@ type generateParams struct {
 	noExtra            bool           // Flag whether the extra field assignment is allowed
 	noTxs              bool           // Flag whether an empty block without any transaction is expected
 	timelockPrivateKey *types.ElgamalPrivateKey
+	timelockPublicKey  *types.ElgamalPublicKey
 }
 
 // prepareWork constructs the sealing task according to the given parameters,
@@ -1119,7 +1121,12 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 		header.MixDigest = genParams.random
 	}
 	if genParams.timelockPrivateKey != nil {
-		header.TimelockPrivatekey = genParams.timelockPrivateKey
+		fmt.Printf("set timelockPrivateKey\n")
+		header.TimelockPrivatekey = types.CopyTimelockPrivatekey(genParams.timelockPrivateKey)
+	}
+	if genParams.timelockPublicKey != nil {
+		fmt.Printf("set timelockPublicKey\n")
+		header.TimelockPublicKey = types.CopyTimelockPublickey(genParams.timelockPublicKey)
 	}
 	// Set baseFee and GasLimit if we are on an EIP-1559 chain
 	if w.chainConfig.IsLondon(header.Number) {
@@ -1318,7 +1325,7 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 // getSealingBlock generates the sealing block based on the given parameters.
 // The generation result will be passed back via the given channel no matter
 // the generation itself succeeds or not.
-func (w *worker) getSealingBlock(parent common.Hash, timestamp uint64, coinbase common.Address, random common.Hash, noTxs bool, timelockPrivateKey *types.ElgamalPrivateKey) (chan *types.Block, chan error, error) {
+func (w *worker) getSealingBlock(parent common.Hash, timestamp uint64, coinbase common.Address, random common.Hash, noTxs bool, timelockPrivateKey *types.ElgamalPrivateKey, timelockPublicKey *types.ElgamalPublicKey) (chan *types.Block, chan error, error) {
 	var (
 		resCh = make(chan *types.Block, 1)
 		errCh = make(chan error, 1)
@@ -1334,6 +1341,7 @@ func (w *worker) getSealingBlock(parent common.Hash, timestamp uint64, coinbase 
 			noExtra:            true,
 			noTxs:              noTxs,
 			timelockPrivateKey: timelockPrivateKey,
+			timelockPublicKey:  timelockPublicKey,
 		},
 		result: resCh,
 		err:    errCh,

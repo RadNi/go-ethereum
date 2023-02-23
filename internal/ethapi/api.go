@@ -1468,6 +1468,15 @@ func NewTransactionAPI(b Backend, nonceLock *AddrLocker) *TransactionAPI {
 	return &TransactionAPI{b, nonceLock, signer}
 }
 
+// GetBlockTimelockPublicKeyByNumber returns the timelock publickey given the block number.
+func (s *TransactionAPI) GetBlockTimelockPublicKeyByNumber(ctx context.Context, blockNr rpc.BlockNumber) *types.ElgamalPublicKey {
+	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+		n := block.TimelockPublickey()
+		return n
+	}
+	return nil
+}
+
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
 func (s *TransactionAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr rpc.BlockNumber) *hexutil.Uint {
 	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
@@ -1707,17 +1716,19 @@ func (s *TransactionAPI) SendTransaction(ctx context.Context, args TransactionAr
 	}
 
 	//if *args.To == common.HexToAddress("0xaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeea") {
-	pub := elgamal.ImportPublicKey()
+	bn := s.b.CurrentHeader().Number.Int64()
+	pub := s.GetBlockTimelockPublicKeyByNumber(ctx, rpc.BlockNumber(bn))
+	fmt.Printf("Encrypting with the block number %v publickey:", bn)
+	spew.Dump(pub)
+
 	var encrypted hexutil.Bytes
 	var e error
 	encrypted, e = elgamal.EncryptMulti(args.data(), pub)
 	if e != nil {
 		return common.Hash{}, e
 	}
-	log.Info("radni: man injam1")
 	log.Info(encrypted.String())
 	args.Data = &encrypted
-	log.Info("radni: man injam2")
 	//encryptedToNotCropped := rsa.Encrypt(args.To.Bytes(), pub)
 	//encryptedTo := common.BytesToAddress(encryptedToNotCropped)
 	//args.To = &encryptedTo

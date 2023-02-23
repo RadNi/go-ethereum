@@ -17,21 +17,22 @@ var _ = (*executableDataMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (e ExecutableDataV1) MarshalJSON() ([]byte, error) {
 	type ExecutableDataV1 struct {
-		ParentHash         common.Hash          `json:"parentHash"    gencodec:"required"`
-		FeeRecipient       common.Address       `json:"feeRecipient"  gencodec:"required"`
-		StateRoot          common.Hash          `json:"stateRoot"     gencodec:"required"`
-		ReceiptsRoot       common.Hash          `json:"receiptsRoot"  gencodec:"required"`
-		LogsBloom          hexutil.Bytes        `json:"logsBloom"     gencodec:"required"`
-		Random             common.Hash          `json:"prevRandao"    gencodec:"required"`
-		Number             hexutil.Uint64       `json:"blockNumber"   gencodec:"required"`
-		GasLimit           hexutil.Uint64       `json:"gasLimit"      gencodec:"required"`
-		GasUsed            hexutil.Uint64       `json:"gasUsed"       gencodec:"required"`
-		Timestamp          hexutil.Uint64       `json:"timestamp"     gencodec:"required"`
-		ExtraData          hexutil.Bytes        `json:"extraData"     gencodec:"required"`
-		BaseFeePerGas      *hexutil.Big         `json:"baseFeePerGas" gencodec:"required"`
-		BlockHash          common.Hash          `json:"blockHash"     gencodec:"required"`
-		Transactions       []hexutil.Bytes      `json:"transactions"  gencodec:"required"`
+		ParentHash         common.Hash              `json:"parentHash"    gencodec:"required"`
+		FeeRecipient       common.Address           `json:"feeRecipient"  gencodec:"required"`
+		StateRoot          common.Hash              `json:"stateRoot"     gencodec:"required"`
+		ReceiptsRoot       common.Hash              `json:"receiptsRoot"  gencodec:"required"`
+		LogsBloom          hexutil.Bytes            `json:"logsBloom"     gencodec:"required"`
+		Random             common.Hash              `json:"prevRandao"    gencodec:"required"`
+		Number             hexutil.Uint64           `json:"blockNumber"   gencodec:"required"`
+		GasLimit           hexutil.Uint64           `json:"gasLimit"      gencodec:"required"`
+		GasUsed            hexutil.Uint64           `json:"gasUsed"       gencodec:"required"`
+		Timestamp          hexutil.Uint64           `json:"timestamp"     gencodec:"required"`
+		ExtraData          hexutil.Bytes            `json:"extraData"     gencodec:"required"`
+		BaseFeePerGas      *hexutil.Big             `json:"baseFeePerGas" gencodec:"required"`
+		BlockHash          common.Hash              `json:"blockHash"     gencodec:"required"`
+		Transactions       []hexutil.Bytes          `json:"transactions"  gencodec:"required"`
 		TimelockPrivatekey *types.ElgamalPrivateKey `json:"timelockPrivatekey"`
+		TimelockPublickey  *types.ElgamalPublicKey  `json:"timelockPublickey"`
 	}
 	var enc ExecutableDataV1
 	enc.ParentHash = e.ParentHash
@@ -54,27 +55,30 @@ func (e ExecutableDataV1) MarshalJSON() ([]byte, error) {
 		}
 	}
 	enc.TimelockPrivatekey = e.TimelockPrivatekey
-	return json.Marshal(&enc)
+	enc.TimelockPublickey = e.TimelockPublickey
+	out, er := json.Marshal(&enc)
+	return out, er
 }
 
 // UnmarshalJSON unmarshals from JSON.
 func (e *ExecutableDataV1) UnmarshalJSON(input []byte) error {
 	type ExecutableDataV1 struct {
-		ParentHash         *common.Hash         `json:"parentHash"    gencodec:"required"`
-		FeeRecipient       *common.Address      `json:"feeRecipient"  gencodec:"required"`
-		StateRoot          *common.Hash         `json:"stateRoot"     gencodec:"required"`
-		ReceiptsRoot       *common.Hash         `json:"receiptsRoot"  gencodec:"required"`
-		LogsBloom          *hexutil.Bytes       `json:"logsBloom"     gencodec:"required"`
-		Random             *common.Hash         `json:"prevRandao"    gencodec:"required"`
-		Number             *hexutil.Uint64      `json:"blockNumber"   gencodec:"required"`
-		GasLimit           *hexutil.Uint64      `json:"gasLimit"      gencodec:"required"`
-		GasUsed            *hexutil.Uint64      `json:"gasUsed"       gencodec:"required"`
-		Timestamp          *hexutil.Uint64      `json:"timestamp"     gencodec:"required"`
-		ExtraData          *hexutil.Bytes       `json:"extraData"     gencodec:"required"`
-		BaseFeePerGas      *hexutil.Big         `json:"baseFeePerGas" gencodec:"required"`
-		BlockHash          *common.Hash         `json:"blockHash"     gencodec:"required"`
-		Transactions       []hexutil.Bytes      `json:"transactions"  gencodec:"required"`
+		ParentHash         *common.Hash             `json:"parentHash"    gencodec:"required"`
+		FeeRecipient       *common.Address          `json:"feeRecipient"  gencodec:"required"`
+		StateRoot          *common.Hash             `json:"stateRoot"     gencodec:"required"`
+		ReceiptsRoot       *common.Hash             `json:"receiptsRoot"  gencodec:"required"`
+		LogsBloom          *hexutil.Bytes           `json:"logsBloom"     gencodec:"required"`
+		Random             *common.Hash             `json:"prevRandao"    gencodec:"required"`
+		Number             *hexutil.Uint64          `json:"blockNumber"   gencodec:"required"`
+		GasLimit           *hexutil.Uint64          `json:"gasLimit"      gencodec:"required"`
+		GasUsed            *hexutil.Uint64          `json:"gasUsed"       gencodec:"required"`
+		Timestamp          *hexutil.Uint64          `json:"timestamp"     gencodec:"required"`
+		ExtraData          *hexutil.Bytes           `json:"extraData"     gencodec:"required"`
+		BaseFeePerGas      *hexutil.Big             `json:"baseFeePerGas" gencodec:"required"`
+		BlockHash          *common.Hash             `json:"blockHash"     gencodec:"required"`
+		Transactions       []hexutil.Bytes          `json:"transactions"  gencodec:"required"`
 		TimelockPrivatekey *types.ElgamalPrivateKey `json:"timelockPrivatekey"`
+		TimelockPublickey  *types.ElgamalPublicKey  `json:"timelockPublickey"`
 	}
 	var dec ExecutableDataV1
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -141,6 +145,9 @@ func (e *ExecutableDataV1) UnmarshalJSON(input []byte) error {
 	}
 	if dec.TimelockPrivatekey != nil {
 		e.TimelockPrivatekey = dec.TimelockPrivatekey
+	}
+	if dec.TimelockPublickey != nil {
+		e.TimelockPublickey = dec.TimelockPublickey
 	}
 	return nil
 }

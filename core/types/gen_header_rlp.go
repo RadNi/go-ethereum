@@ -41,8 +41,9 @@ func (obj *Header) EncodeRLP(_w io.Writer) error {
 	w.WriteBytes(obj.MixDigest[:])
 	w.WriteBytes(obj.Nonce[:])
 	_tmp1 := obj.BaseFee != nil
-	_tmp2 := obj.TimelockPrivatekey != nil
-	if _tmp1 || _tmp2 {
+	_tmp2 := obj.TimelockPublicKey != nil
+	_tmp3 := obj.TimelockPrivatekey != nil
+	if _tmp1 || _tmp2 || _tmp3 {
 		if obj.BaseFee == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -52,22 +53,33 @@ func (obj *Header) EncodeRLP(_w io.Writer) error {
 			w.WriteBigInt(obj.BaseFee)
 		}
 	}
-	if _tmp2 {
+	if _tmp2 || _tmp3 {
+		if obj.TimelockPublicKey == nil {
+			w.Write([]byte{0xC0})
+		} else {
+			_tmp4 := w.List()
+			w.WriteBytes(obj.TimelockPublicKey.P)
+			w.WriteBytes(obj.TimelockPublicKey.G)
+			w.WriteBytes(obj.TimelockPublicKey.Y)
+			w.ListEnd(_tmp4)
+		}
+	}
+	if _tmp3 {
 		if obj.TimelockPrivatekey == nil {
 			w.Write([]byte{0xC0})
 		} else {
-			_tmp3 := w.List()
+			_tmp5 := w.List()
 			if obj.TimelockPrivatekey.PublicKey == nil {
 				w.Write([]byte{0xC0})
 			} else {
-				_tmp4 := w.List()
+				_tmp6 := w.List()
 				w.WriteBytes(obj.TimelockPrivatekey.PublicKey.P)
 				w.WriteBytes(obj.TimelockPrivatekey.PublicKey.G)
 				w.WriteBytes(obj.TimelockPrivatekey.PublicKey.Y)
-				w.ListEnd(_tmp4)
+				w.ListEnd(_tmp6)
 			}
 			w.WriteBytes(obj.TimelockPrivatekey.X)
-			w.ListEnd(_tmp3)
+			w.ListEnd(_tmp5)
 		}
 	}
 	w.ListEnd(_tmp0)

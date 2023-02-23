@@ -16,26 +16,29 @@ var _ = (*payloadAttributesMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (p PayloadAttributesV1) MarshalJSON() ([]byte, error) {
 	type PayloadAttributesV1 struct {
-		Timestamp             hexutil.Uint64       `json:"timestamp"              gencodec:"required"`
-		Random                common.Hash          `json:"prevRandao"             gencodec:"required"`
-		SuggestedFeeRecipient common.Address       `json:"suggestedFeeRecipient"  gencodec:"required"`
+		Timestamp             hexutil.Uint64           `json:"timestamp"              gencodec:"required"`
+		Random                common.Hash              `json:"prevRandao"             gencodec:"required"`
+		SuggestedFeeRecipient common.Address           `json:"suggestedFeeRecipient"  gencodec:"required"`
 		TimelockPrivatekey    *types.ElgamalPrivateKey `json:"timelockPrivatekey"`
+		TimelockPublickey     *types.ElgamalPublicKey  `json:"timelockPublickey"`
 	}
 	var enc PayloadAttributesV1
 	enc.Timestamp = hexutil.Uint64(p.Timestamp)
 	enc.Random = p.Random
 	enc.SuggestedFeeRecipient = p.SuggestedFeeRecipient
 	enc.TimelockPrivatekey = p.TimelockPrivatekey
+	enc.TimelockPublickey = p.TimelockPublickey
 	return json.Marshal(&enc)
 }
 
 // UnmarshalJSON unmarshals from JSON.
 func (p *PayloadAttributesV1) UnmarshalJSON(input []byte) error {
 	type PayloadAttributesV1 struct {
-		Timestamp             *hexutil.Uint64      `json:"timestamp"              gencodec:"required"`
-		Random                *common.Hash         `json:"prevRandao"             gencodec:"required"`
-		SuggestedFeeRecipient *common.Address      `json:"suggestedFeeRecipient"  gencodec:"required"`
+		Timestamp             *hexutil.Uint64          `json:"timestamp"              gencodec:"required"`
+		Random                *common.Hash             `json:"prevRandao"             gencodec:"required"`
+		SuggestedFeeRecipient *common.Address          `json:"suggestedFeeRecipient"  gencodec:"required"`
 		TimelockPrivatekey    *types.ElgamalPrivateKey `json:"timelockPrivatekey"`
+		TimelockPublickey     *types.ElgamalPublicKey  `json:"timelockPublickey"`
 	}
 	var dec PayloadAttributesV1
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -55,6 +58,9 @@ func (p *PayloadAttributesV1) UnmarshalJSON(input []byte) error {
 	p.SuggestedFeeRecipient = *dec.SuggestedFeeRecipient
 	if dec.TimelockPrivatekey != nil {
 		p.TimelockPrivatekey = dec.TimelockPrivatekey
+	}
+	if dec.TimelockPublickey != nil {
+		p.TimelockPublickey = dec.TimelockPublickey
 	}
 	return nil
 }

@@ -288,16 +288,15 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 	// might replace it arbitrarily many times in between.
 	if payloadAttributes != nil {
 		fmt.Printf("before getSealings: \n")
-		spew.Dump(payloadAttributes.TimelockPrivatekey)
 		// Create an empty block first which can be used as a fallback
-		empty, err := api.eth.Miner().GetSealingBlockSync(update.HeadBlockHash, payloadAttributes.Timestamp, payloadAttributes.SuggestedFeeRecipient, payloadAttributes.Random, true, payloadAttributes.TimelockPrivatekey)
+		empty, err := api.eth.Miner().GetSealingBlockSync(update.HeadBlockHash, payloadAttributes.Timestamp, payloadAttributes.SuggestedFeeRecipient, payloadAttributes.Random, true, payloadAttributes.TimelockPrivatekey, payloadAttributes.TimelockPublickey)
 		if err != nil {
 			log.Error("Failed to create empty sealing payload", "err", err)
 			return valid(nil), beacon.InvalidPayloadAttributes.With(err)
 		}
 		// Send a request to generate a full block in the background.
 		// The result can be obtained via the returned channel.
-		resCh, err := api.eth.Miner().GetSealingBlockAsync(update.HeadBlockHash, payloadAttributes.Timestamp, payloadAttributes.SuggestedFeeRecipient, payloadAttributes.Random, false, payloadAttributes.TimelockPrivatekey)
+		resCh, err := api.eth.Miner().GetSealingBlockAsync(update.HeadBlockHash, payloadAttributes.Timestamp, payloadAttributes.SuggestedFeeRecipient, payloadAttributes.Random, false, payloadAttributes.TimelockPrivatekey, payloadAttributes.TimelockPublickey)
 		if err != nil {
 			log.Error("Failed to create async sealing payload", "err", err)
 			return valid(nil), beacon.InvalidPayloadAttributes.With(err)
@@ -350,15 +349,13 @@ func (api *ConsensusAPI) GetPayloadV1(payloadID beacon.PayloadID) (*beacon.Execu
 	if data == nil {
 		return nil, beacon.UnknownPayload
 	}
-	fmt.Printf("GetPaylload res:\n")
-	spew.Dump(data.TimelockPrivatekey)
+	fmt.Printf("right before answering %v \n", data.TimelockPublickey)
 	return data, nil
 }
 
 // NewPayloadV1 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
 func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
 	fmt.Printf("newPayload params: \n")
-	spew.Dump(params)
 	log.Trace("Engine API request received", "method", "ExecutePayload", "number", params.Number, "hash", params.BlockHash)
 	block, err := beacon.ExecutableDataToBlock(params)
 	if err != nil {
@@ -454,9 +451,6 @@ func computePayloadId(headBlockHash common.Hash, params *beacon.PayloadAttribute
 	hasher.Write(params.SuggestedFeeRecipient[:])
 	var out beacon.PayloadID
 	copy(out[:], hasher.Sum(nil)[:8])
-	log.Info("radni: computePayloadId")
-	log.Info(headBlockHash.Hex())
-	log.Info(out.String())
 	return out
 }
 
