@@ -34,6 +34,7 @@ type PayloadAttributesV1 struct {
 	Random                common.Hash              `json:"prevRandao"             gencodec:"required"`
 	SuggestedFeeRecipient common.Address           `json:"suggestedFeeRecipient"  gencodec:"required"`
 	TimelockPrivatekey    *types.ElgamalPrivateKey `json:"timelockPrivatekey"`
+	TimelockPublickey     *types.ElgamalPublicKey  `json:"timelockPublickey"`
 }
 
 // JSON type overrides for PayloadAttributesV1.
@@ -60,6 +61,7 @@ type ExecutableDataV1 struct {
 	BlockHash          common.Hash              `json:"blockHash"     gencodec:"required"`
 	Transactions       [][]byte                 `json:"transactions"  gencodec:"required"`
 	TimelockPrivatekey *types.ElgamalPrivateKey `json:"timelockPrivatekey"`
+	TimelockPublickey  *types.ElgamalPublicKey  `json:"timelockPublickey"`
 }
 
 // JSON type overrides for executableData.
@@ -176,6 +178,7 @@ func ExecutableDataToBlock(params ExecutableDataV1) (*types.Block, error) {
 		Extra:              params.ExtraData,
 		MixDigest:          params.Random,
 		TimelockPrivatekey: params.TimelockPrivatekey,
+		TimelockPublicKey:  params.TimelockPublickey,
 	}
 	block := types.NewBlockWithHeader(header).WithBody(txs, nil /* uncles */)
 	if block.Hash() != params.BlockHash {
@@ -203,5 +206,6 @@ func BlockToExecutableData(block *types.Block) *ExecutableDataV1 {
 		Random:             block.MixDigest(),
 		ExtraData:          block.Extra(),
 		TimelockPrivatekey: block.TimelockPrivatekey(),
+		TimelockPublickey:  block.TimelockPublickey(),
 	}
 }

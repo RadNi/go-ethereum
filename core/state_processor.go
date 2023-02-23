@@ -94,7 +94,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			}
 		}
 		if len(orderedDelayedTransaction) != len(orderedDelayedTransaction) {
-			return nil, nil, 0, fmt.Errorf("Encrypted transactions number doesn't match delayed transactions'")
+			return nil, nil, 0, fmt.Errorf("encrypted transactions number doesn't match delayed transactions")
 		}
 		for i, tx := range orderedEncryptedTransaction {
 			if tx.Hash() == orderedDelayedTransaction[i].Hash() {
@@ -108,7 +108,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 				return nil, nil, 0, fmt.Errorf("after the transition, tx of Normal type is not allowed tx %d [%v]", i, tx.Hash().Hex())
 			}
 		}
-		msg, err := tx.AsMessage(types.MakeSigner(p.config, header.Number), header.BaseFee, header.TimelockPrivatekey)
+		fmt.Printf("got the private key: %v for %v\n", header.TimelockPrivatekey.X, header.Number)
+		prv := p.bc.GetBlockByNumber(header.Number.Uint64() - 2).TimelockPrivatekey()
+		fmt.Printf("unlocking with: %v\n", prv.X)
+		msg, err := tx.AsMessage(types.MakeSigner(p.config, header.Number), header.BaseFee, prv)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}

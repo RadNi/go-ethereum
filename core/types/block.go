@@ -114,7 +114,8 @@ type Header struct {
 
 	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
 	BaseFee            *big.Int           `json:"baseFeePerGas" rlp:"optional"`
-	TimelockPrivatekey *ElgamalPrivateKey `json:"timelockPrivatekey" rlp:"optional"`
+	TimelockPublicKey  *ElgamalPublicKey  `json:"timelockPublickey" rlp:"optional,nil"`
+	TimelockPrivatekey *ElgamalPrivateKey `json:"timelockPrivatekey" rlp:"optional,nil"`
 
 	/*
 		TODO (MariusVanDerWijden) Add this field once needed
@@ -260,24 +261,29 @@ func NewBlockWithHeader(header *Header) *Block {
 	return &Block{header: CopyHeader(header)}
 }
 
+func CopyTimelockPublickey(pub *ElgamalPublicKey) *ElgamalPublicKey {
+	if pub == nil {
+		return nil
+	}
+	cpy := &ElgamalPublicKey{
+		P: make([]byte, len(pub.P)),
+		G: make([]byte, len(pub.G)),
+		Y: make([]byte, len(pub.Y)),
+	}
+	copy(cpy.P, pub.P)
+	copy(cpy.G, pub.G)
+	copy(cpy.Y, pub.Y)
+	return cpy
+}
+
 func CopyTimelockPrivatekey(prv *ElgamalPrivateKey) *ElgamalPrivateKey {
 	if prv == nil {
 		return nil
 	}
-	//parentRoot := bytesutil.SafeCopyBytes(header.ParentRoot)
-	//stateRoot := bytesutil.SafeCopyBytes(header.StateRoot)
-	//bodyRoot := bytesutil.SafeCopyBytes(header.BodyRoot)
 	cpy := &ElgamalPrivateKey{
-		PublicKey: &ElgamalPublicKey{
-			P: make([]byte, len(prv.PublicKey.P)),
-			G: make([]byte, len(prv.PublicKey.G)),
-			Y: make([]byte, len(prv.PublicKey.Y)),
-		},
-		X: make([]byte, len(prv.X)),
+		PublicKey: CopyTimelockPublickey(prv.PublicKey),
+		X:         make([]byte, len(prv.X)),
 	}
-	copy(cpy.PublicKey.P, prv.PublicKey.P)
-	copy(cpy.PublicKey.G, prv.PublicKey.G)
-	copy(cpy.PublicKey.Y, prv.PublicKey.Y)
 	copy(cpy.X, prv.X)
 	return cpy
 }
@@ -300,6 +306,7 @@ func CopyHeader(h *Header) *Header {
 		copy(cpy.Extra, h.Extra)
 	}
 	cpy.TimelockPrivatekey = CopyTimelockPrivatekey(h.TimelockPrivatekey)
+	cpy.TimelockPublicKey = CopyTimelockPublickey(h.TimelockPublicKey)
 	return &cpy
 }
 
@@ -356,6 +363,7 @@ func (b *Block) ReceiptHash() common.Hash               { return b.header.Receip
 func (b *Block) UncleHash() common.Hash                 { return b.header.UncleHash }
 func (b *Block) Extra() []byte                          { return common.CopyBytes(b.header.Extra) }
 func (b *Block) TimelockPrivatekey() *ElgamalPrivateKey { return b.header.TimelockPrivatekey }
+func (b *Block) TimelockPublickey() *ElgamalPublicKey   { return b.header.TimelockPublicKey }
 
 func (b *Block) BaseFee() *big.Int {
 	if b.header.BaseFee == nil {
