@@ -77,13 +77,20 @@ func NewTx(inner TxData) *Transaction {
 // This is implemented by DynamicFeeTx, LegacyTx and AccessListTx.
 type TxData interface {
 	txMode() byte // returns the mode ID
+	txEncryptedData() []byte
+	txEncryptedTo() []byte
+	txEncryptionPubkey() []byte
 	txType() byte // returns the type ID
 	copy() TxData // creates a deep copy and initializes all fields
 	setMode(byte)
+	setEncryptedData([]byte)
+	setEncryptedTo([]byte)
+	setEncryptionPubkey([]byte)
 
 	chainID() *big.Int
 	accessList() AccessList
 	data() []byte
+	setData([]byte)
 	gas() uint64
 	gasPrice() *big.Int
 	gasTipCap() *big.Int
@@ -91,6 +98,7 @@ type TxData interface {
 	value() *big.Int
 	nonce() uint64
 	to() *common.Address
+	setTo(*common.Address)
 
 	rawSignatureValues() (v, r, s *big.Int)
 	setSignatureValues(chainID, v, r, s *big.Int)
@@ -256,9 +264,39 @@ func (tx *Transaction) Copy() *Transaction {
 	return NewTx(tx.inner.copy())
 }
 
-// Type returns the transaction type.
+// Mode returns the transaction mode.
 func (tx *Transaction) Mode() byte {
 	return tx.inner.txMode()
+}
+
+// SetEncryptedTo returns the transaction EncryptedTo.
+func (tx *Transaction) SetEncryptedTo(data []byte) {
+	tx.inner.setEncryptedTo(data)
+}
+
+// SetEncryptedData returns the transaction EncryptedData.
+func (tx *Transaction) SetEncryptedData(data []byte) {
+	tx.inner.setEncryptedData(data)
+}
+
+// SetEncryptionPubkey returns the transaction EncryptionPubkey.
+func (tx *Transaction) SetEncryptionPubkey(data []byte) {
+	tx.inner.setEncryptionPubkey(data)
+}
+
+// EncryptedTo returns the transaction EncryptedTo.
+func (tx *Transaction) EncryptedTo() []byte {
+	return tx.inner.txEncryptedTo()
+}
+
+// EncryptedData returns the transaction EncryptedData.
+func (tx *Transaction) EncryptedData() []byte {
+	return tx.inner.txEncryptedData()
+}
+
+// EncryptionPubkey returns the transaction EncryptionPubkey.
+func (tx *Transaction) EncryptionPubkey() []byte {
+	return tx.inner.txEncryptionPubkey()
 }
 
 func (tx *Transaction) SetMode(mode byte) {
@@ -279,6 +317,9 @@ func (tx *Transaction) ChainId() *big.Int {
 
 // Data returns the input data of the transaction.
 func (tx *Transaction) Data() []byte { return tx.inner.data() }
+
+// SetData returns the input data of the transaction.
+func (tx *Transaction) SetData(data []byte) { tx.inner.setData(data) }
 
 // AccessList returns the access list of the transaction.
 func (tx *Transaction) AccessList() AccessList { return tx.inner.accessList() }
@@ -305,6 +346,10 @@ func (tx *Transaction) Nonce() uint64 { return tx.inner.nonce() }
 // For contract-creation transactions, To returns nil.
 func (tx *Transaction) To() *common.Address {
 	return copyAddressPtr(tx.inner.to())
+}
+
+func (tx *Transaction) SetTo(to *common.Address) {
+	tx.inner.setTo(copyAddressPtr(to))
 }
 
 // Cost returns gas * gasPrice + value.
@@ -601,20 +646,23 @@ func (t *TransactionsByPriceAndNonce) Pop() {
 //
 // NOTE: In a future PR this will be removed.
 type Message struct {
-	mode       byte
-	to         *common.Address
-	from       common.Address
-	nonce      uint64
-	amount     *big.Int
-	gasLimit   uint64
-	gasPrice   *big.Int
-	gasFeeCap  *big.Int
-	gasTipCap  *big.Int
-	data       []byte
-	accessList AccessList
-	isFake     bool
-	txType     byte
-	privateKey *ElgamalPrivateKey
+	mode             byte
+	encryptedTo      []byte
+	encryptedData    []byte
+	encryptionPubKey []byte
+	to               *common.Address
+	from             common.Address
+	nonce            uint64
+	amount           *big.Int
+	gasLimit         uint64
+	gasPrice         *big.Int
+	gasFeeCap        *big.Int
+	gasTipCap        *big.Int
+	data             []byte
+	accessList       AccessList
+	isFake           bool
+	txType           byte
+	privateKey       *ElgamalPrivateKey
 }
 
 func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool, mode byte, prv *ElgamalPrivateKey, txTypes ...byte) Message {
@@ -658,19 +706,22 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 // AsMessage returns the transaction as a core.Message.
 func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int, prv *ElgamalPrivateKey) (Message, error) {
 	msg := Message{
-		mode:       tx.Mode(),
-		nonce:      tx.Nonce(),
-		gasLimit:   tx.Gas(),
-		gasPrice:   new(big.Int).Set(tx.GasPrice()),
-		gasFeeCap:  new(big.Int).Set(tx.GasFeeCap()),
-		gasTipCap:  new(big.Int).Set(tx.GasTipCap()),
-		to:         tx.To(),
-		amount:     tx.Value(),
-		data:       tx.Data(),
-		accessList: tx.AccessList(),
-		isFake:     false,
-		txType:     tx.Type(),
-		privateKey: prv,
+		mode:             tx.Mode(),
+		encryptedTo:      tx.EncryptedTo(),
+		encryptedData:    tx.EncryptedData(),
+		encryptionPubKey: tx.EncryptionPubkey(),
+		nonce:            tx.Nonce(),
+		gasLimit:         tx.Gas(),
+		gasPrice:         new(big.Int).Set(tx.GasPrice()),
+		gasFeeCap:        new(big.Int).Set(tx.GasFeeCap()),
+		gasTipCap:        new(big.Int).Set(tx.GasTipCap()),
+		to:               tx.To(),
+		amount:           tx.Value(),
+		data:             tx.Data(),
+		accessList:       tx.AccessList(),
+		isFake:           false,
+		txType:           tx.Type(),
+		privateKey:       prv,
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
@@ -681,21 +732,29 @@ func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int, prv *ElgamalPrivate
 	return msg, err
 }
 
-func (m Message) From() common.Address           { return m.from }
-func (m Message) To() *common.Address            { return m.to }
-func (m Message) GasPrice() *big.Int             { return m.gasPrice }
-func (m Message) GasFeeCap() *big.Int            { return m.gasFeeCap }
-func (m Message) GasTipCap() *big.Int            { return m.gasTipCap }
-func (m Message) Value() *big.Int                { return m.amount }
-func (m Message) Gas() uint64                    { return m.gasLimit }
-func (m Message) Nonce() uint64                  { return m.nonce }
-func (m Message) Data() []byte                   { return m.data }
-func (m Message) AccessList() AccessList         { return m.accessList }
-func (m Message) IsFake() bool                   { return m.isFake }
-func (m Message) UpdateData(new []byte)          { m.data = new }
-func (m Message) UpdateTo(new *common.Address)   { m.to = new }
+func (m Message) From() common.Address   { return m.from }
+func (m Message) To() *common.Address    { return m.to }
+func (m Message) GasPrice() *big.Int     { return m.gasPrice }
+func (m Message) GasFeeCap() *big.Int    { return m.gasFeeCap }
+func (m Message) GasTipCap() *big.Int    { return m.gasTipCap }
+func (m Message) Value() *big.Int        { return m.amount }
+func (m Message) Gas() uint64            { return m.gasLimit }
+func (m Message) Nonce() uint64          { return m.nonce }
+func (m Message) Data() []byte           { return m.data }
+func (m Message) AccessList() AccessList { return m.accessList }
+func (m Message) IsFake() bool           { return m.isFake }
+func (m Message) UpdateData(new []byte) {
+	m.data = make([]byte, len(new))
+	copy(m.data, new)
+}
+func (m Message) UpdateTo(new *common.Address) {
+	m.to = copyAddressPtr(new)
+}
 func (m Message) Type() byte                     { return m.txType }
 func (m Message) Mode() byte                     { return m.mode }
+func (m Message) EncryptedTo() []byte            { return m.encryptedTo }
+func (m Message) EncryptedData() []byte          { return m.encryptedData }
+func (m Message) EncryptionPubkey() []byte       { return m.encryptionPubKey }
 func (m Message) PrivateKey() *ElgamalPrivateKey { return m.privateKey }
 
 // copyAddressPtr copies an address.

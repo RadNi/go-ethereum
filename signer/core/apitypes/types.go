@@ -82,7 +82,10 @@ func (v *ValidationMessages) GetWarnings() error {
 // This struct is identical to ethapi.TransactionArgs, except for the usage of
 // common.MixedcaseAddress in From and To
 type SendTxArgs struct {
-	Mode				 byte					  `json:"mode"`
+	Mode                 byte                     `json:"mode"`
+	EncryptedTo          *hexutil.Bytes           `json:"encryptedTo"`
+	EncryptedData        *hexutil.Bytes           `json:"encryptedData"`
+	EncryptionPubkey     *hexutil.Bytes           `json:"EncryptionPubkey"`
 	From                 common.MixedcaseAddress  `json:"from"`
 	To                   *common.MixedcaseAddress `json:"to"`
 	Gas                  hexutil.Uint64           `json:"gas"`
@@ -135,20 +138,23 @@ func (args *SendTxArgs) ToTransaction() *types.Transaction {
 			al = *args.AccessList
 		}
 		data = &types.DynamicFeeTx{
-			Mode:		args.Mode,
-			To:         to,
-			ChainID:    (*big.Int)(args.ChainID),
-			Nonce:      uint64(args.Nonce),
-			Gas:        uint64(args.Gas),
-			GasFeeCap:  (*big.Int)(args.MaxFeePerGas),
-			GasTipCap:  (*big.Int)(args.MaxPriorityFeePerGas),
-			Value:      (*big.Int)(&args.Value),
-			Data:       input,
-			AccessList: al,
+			Mode:             args.Mode,
+			EncryptedTo:      *args.EncryptedTo,
+			EncryptedData:    *args.EncryptedData,
+			EncryptionPubkey: *args.EncryptionPubkey,
+			To:               to,
+			ChainID:          (*big.Int)(args.ChainID),
+			Nonce:            uint64(args.Nonce),
+			Gas:              uint64(args.Gas),
+			GasFeeCap:        (*big.Int)(args.MaxFeePerGas),
+			GasTipCap:        (*big.Int)(args.MaxPriorityFeePerGas),
+			Value:            (*big.Int)(&args.Value),
+			Data:             input,
+			AccessList:       al,
 		}
 	case args.AccessList != nil:
 		data = &types.AccessListTx{
-			Mode:		types.Normal,
+			Mode:       types.Normal,
 			To:         to,
 			ChainID:    (*big.Int)(args.ChainID),
 			Nonce:      uint64(args.Nonce),
@@ -160,13 +166,16 @@ func (args *SendTxArgs) ToTransaction() *types.Transaction {
 		}
 	default:
 		data = &types.LegacyTx{
-			Mode:	  args.Mode,
-			To:       to,
-			Nonce:    uint64(args.Nonce),
-			Gas:      uint64(args.Gas),
-			GasPrice: (*big.Int)(args.GasPrice),
-			Value:    (*big.Int)(&args.Value),
-			Data:     input,
+			Mode:             args.Mode,
+			EncryptedTo:      *args.EncryptedTo,
+			EncryptedData:    *args.EncryptedData,
+			EncryptionPubkey: *args.EncryptionPubkey,
+			To:               to,
+			Nonce:            uint64(args.Nonce),
+			Gas:              uint64(args.Gas),
+			GasPrice:         (*big.Int)(args.GasPrice),
+			Value:            (*big.Int)(&args.Value),
+			Data:             input,
 		}
 	}
 	return types.NewTx(data)

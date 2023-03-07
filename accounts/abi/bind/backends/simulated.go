@@ -816,6 +816,9 @@ type callMsg struct {
 }
 
 func (m callMsg) Mode() byte                   { return m.CallMsg.Mode }
+func (m callMsg) EncryptedTo() []byte          { return m.CallMsg.EncryptedTo }
+func (m callMsg) EncryptedData() []byte        { return m.CallMsg.EncryptedData }
+func (m callMsg) EncryptionPubkey() []byte     { return m.CallMsg.EncryptionPubkey }
 func (m callMsg) From() common.Address         { return m.CallMsg.From }
 func (m callMsg) Nonce() uint64                { return 0 }
 func (m callMsg) IsFake() bool                 { return true }

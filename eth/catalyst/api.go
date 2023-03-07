@@ -18,11 +18,11 @@
 package catalyst
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"math/big"
 	"sync"
 	"time"
@@ -163,8 +163,7 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 	api.forkchoiceLock.Lock()
 	defer api.forkchoiceLock.Unlock()
 
-	fmt.Printf("hamin avale kar too ForkChoice: \n")
-	spew.Dump(payloadAttributes.TimelockPrivatekey)
+	fmt.Printf("hamin avale kar too ForkChoice: %v\n", payloadAttributes.TimelockPrivatekey.PublicKey.Y[:16])
 
 	log.Trace("Engine API request received", "method", "ForkchoiceUpdated", "head", update.HeadBlockHash, "finalized", update.FinalizedBlockHash, "safe", update.SafeBlockHash)
 	if update.HeadBlockHash == (common.Hash{}) {
@@ -288,6 +287,13 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 	// might replace it arbitrarily many times in between.
 	if payloadAttributes != nil {
 		fmt.Printf("before getSealings: \n")
+		h := api.eth.BlockChain().CurrentHeader()
+		if payloadAttributes.TimelockPrivatekey != nil && h.Number.Uint64() >= 12 {
+			b := api.eth.BlockChain().GetBlockByNumber(h.Number.Uint64() - 4) // TODO why it should be less than delay by one?!
+			if bytes.Compare(payloadAttributes.TimelockPrivatekey.PublicKey.Y, b.TimelockPublickey().Y) != 0 {
+				log.Error("the newly received privatekey doesn't match with the fifth last publickey!")
+			}
+		}
 		// Create an empty block first which can be used as a fallback
 		empty, err := api.eth.Miner().GetSealingBlockSync(update.HeadBlockHash, payloadAttributes.Timestamp, payloadAttributes.SuggestedFeeRecipient, payloadAttributes.Random, true, payloadAttributes.TimelockPrivatekey, payloadAttributes.TimelockPublickey)
 		if err != nil {
@@ -349,7 +355,6 @@ func (api *ConsensusAPI) GetPayloadV1(payloadID beacon.PayloadID) (*beacon.Execu
 	if data == nil {
 		return nil, beacon.UnknownPayload
 	}
-	fmt.Printf("right before answering %v \n", data.TimelockPublickey)
 	return data, nil
 }
 

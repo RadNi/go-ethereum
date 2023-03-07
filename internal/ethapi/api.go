@@ -1683,7 +1683,7 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 		return common.Hash{}, err
 	}
 
-	if tx.To() == nil {
+	if tx.To() == nil && tx.EncryptedTo() == nil {
 		addr := crypto.CreateAddress(from, tx.Nonce())
 		log.Info("Submitted contract creation", "hash", tx.Hash().Hex(), "from", from, "nonce", tx.Nonce(), "contract", addr.Hex(), "value", tx.Value())
 	} else {
@@ -1719,16 +1719,28 @@ func (s *TransactionAPI) SendTransaction(ctx context.Context, args TransactionAr
 	bn := s.b.CurrentHeader().Number.Int64()
 	pub := s.GetBlockTimelockPublicKeyByNumber(ctx, rpc.BlockNumber(bn))
 	fmt.Printf("Encrypting with the block number %v publickey:", bn)
-	spew.Dump(pub)
 
 	var encrypted hexutil.Bytes
+	var y hexutil.Bytes
 	var e error
 	encrypted, e = elgamal.EncryptMulti(args.data(), pub)
 	if e != nil {
 		return common.Hash{}, e
 	}
 	log.Info(encrypted.String())
-	args.Data = &encrypted
+	args.EncryptedData = &encrypted
+	args.Data = nil
+	encrypted, e = elgamal.EncryptMulti(args.To.Bytes(), pub)
+	fmt.Printf("encrypting %v\n", args.To.Bytes())
+	fmt.Printf("to %v\n", encrypted)
+	fmt.Printf("via %v\n", pub.Y)
+	if e != nil {
+		return common.Hash{}, e
+	}
+	args.EncryptedTo = &encrypted
+	args.To = nil
+	y = pub.Y
+	args.EncryptionPubkey = &y
 	//encryptedToNotCropped := rsa.Encrypt(args.To.Bytes(), pub)
 	//encryptedTo := common.BytesToAddress(encryptedToNotCropped)
 	//args.To = &encryptedTo

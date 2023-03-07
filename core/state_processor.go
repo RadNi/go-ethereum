@@ -17,6 +17,7 @@
 package core
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 
@@ -76,13 +77,20 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	// Iterate over and process the individual transactions
 	// First check the delayed transactions are added properly, and in the right order
 	var pb *types.Block
-	currentLen := p.bc.CurrentBlock().NumberU64()
-	if currentLen >= 10 {
+	currentLen := p.bc.CurrentHeader().Number.Uint64()
 
-		var delay uint64 = 2
+	if currentLen >= 12 {
+
+		pb = p.bc.GetBlockByNumber(header.Number.Uint64() - 5)
+
+		fmt.Printf("iterating over block number %v %v\n", pb.Number(), pb.Transactions().Len())
+		if bytes.Compare(header.TimelockPrivatekey.PublicKey.Y, pb.TimelockPublickey().Y) != 0 {
+			log.Error("The privatekey doesn't match with the fifth last publickey.")
+			fmt.Printf("Privatekey: %v\npublickey: %v\n", header.TimelockPrivatekey.PublicKey.Y[:16], pb.TimelockPublickey().Y[:16])
+		}
+
 		var orderedEncryptedTransaction types.Transactions
 		var orderedDelayedTransaction types.Transactions
-		pb = p.bc.GetBlockByNumber(currentLen - delay)
 		for _, tx := range pb.Transactions() {
 			if tx.Mode() == types.Encrypted {
 				orderedEncryptedTransaction = append(orderedEncryptedTransaction, tx)
@@ -93,7 +101,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 				orderedDelayedTransaction = append(orderedDelayedTransaction, tx)
 			}
 		}
-		if len(orderedDelayedTransaction) != len(orderedDelayedTransaction) {
+		if len(orderedDelayedTransaction) != len(orderedEncryptedTransaction) {
 			return nil, nil, 0, fmt.Errorf("encrypted transactions number doesn't match delayed transactions")
 		}
 		for i, tx := range orderedEncryptedTransaction {
@@ -103,26 +111,51 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		}
 	}
 	for i, tx := range block.Transactions() {
-		if currentLen >= 10 {
+		if currentLen >= 12 {
 			if tx.Mode() == types.Normal {
 				return nil, nil, 0, fmt.Errorf("after the transition, tx of Normal type is not allowed tx %d [%v]", i, tx.Hash().Hex())
 			}
 		}
-		fmt.Printf("got the private key: %v for %v\n", header.TimelockPrivatekey.X, header.Number)
-		prv := p.bc.GetBlockByNumber(header.Number.Uint64() - 2).TimelockPrivatekey()
-		fmt.Printf("unlocking with: %v\n", prv.X)
+		fmt.Printf("executing %v\n", tx.Hash())
+		var prv *types.ElgamalPrivateKey
+		if tx.Mode() == types.Delayed {
+			prv1 := header.TimelockPrivatekey
+			fmt.Printf("got the private key 1\n")
+			prv2 := p.bc.GetBlockByNumber(header.Number.Uint64() - 1).Header().TimelockPrivatekey
+			fmt.Printf("got the private key 2\n")
+			prv3 := p.bc.GetBlockByNumber(header.Number.Uint64() - 2).Header().TimelockPrivatekey
+			fmt.Printf("got the private key 3\n")
+			if bytes.Compare(tx.EncryptionPubkey(), prv1.PublicKey.Y) == 0 {
+				prv = prv1
+				fmt.Printf("Found privatekey corresponding to %v", header.Number)
+			} else if bytes.Compare(tx.EncryptionPubkey(), prv2.PublicKey.Y) == 0 {
+				prv = prv2
+				fmt.Printf("Found privatekey corresponding to %v", header.Number.Uint64()-1)
+			} else if bytes.Compare(tx.EncryptionPubkey(), prv3.PublicKey.Y) == 0 {
+				prv = prv3
+				fmt.Printf("Found privatekey corresponding to %v", header.Number.Uint64()-2)
+			} else {
+				fmt.Printf("1. Couldn't find the publicKey %v\n%v\n%v\n", tx.EncryptionPubkey(), prv1.PublicKey.Y, prv2.PublicKey.Y)
+			}
+			//if prv != nil || tx.Mode() != types.Delayed {
+			fmt.Printf("arrived here\n")
+			if prv != nil {
+				fmt.Printf("unlocking with: %v for %v\n", prv.X, header.Number)
+			}
+		}
 		msg, err := tx.AsMessage(types.MakeSigner(p.config, header.Number), header.BaseFee, prv)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
 		statedb.Prepare(tx.Hash(), i)
-		log.Info("dg inja na jedan!")
+		//fmt.Printf("msg prvKey: %v %v\n", msg.PrivateKey().X, msg.PrivateKey().PublicKey.Y)
 		receipt, err := applyTransaction(msg, p.config, nil, gp, statedb, blockNumber, blockHash, tx, usedGas, vmenv)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
+		//}
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
 	p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.Uncles())
@@ -136,7 +169,6 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, author *com
 	evm.Reset(txContext, statedb)
 
 	// Apply the transaction to the current state (included in the env).
-	log.Info("chera az inja akhe?!")
 	result, err := ApplyMessage(evm, msg, gp)
 	if err != nil {
 		log.Info("radni: ApplyMessage result errored ")
@@ -164,7 +196,7 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, author *com
 	receipt.GasUsed = result.UsedGas
 
 	// If the transaction created a contract, store the creation address in the receipt.
-	if msg.To() == nil {
+	if msg.To() == nil && msg.EncryptedTo() == nil {
 		receipt.ContractAddress = crypto.CreateAddress(evm.TxContext.Origin, tx.Nonce())
 	}
 
