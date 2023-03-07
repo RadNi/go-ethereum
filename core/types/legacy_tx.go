@@ -24,21 +24,24 @@ import (
 
 // LegacyTx is the transaction data of regular Ethereum transactions.
 type LegacyTx struct {
-	Mode     byte
-	Nonce    uint64          // nonce of sender account
-	GasPrice *big.Int        // wei per gas
-	Gas      uint64          // gas limit
-	To       *common.Address `rlp:"nil"` // nil means contract creation
-	Value    *big.Int        // wei amount
-	Data     []byte          // contract invocation input data
-	V, R, S  *big.Int        // signature values
+	Mode             byte
+	EncryptedTo      []byte
+	EncryptedData    []byte
+	EncryptionPubkey []byte
+	Nonce            uint64          // nonce of sender account
+	GasPrice         *big.Int        // wei per gas
+	Gas              uint64          // gas limit
+	To               *common.Address `rlp:"nil"` // nil means contract creation
+	Value            *big.Int        // wei amount
+	Data             []byte          // contract invocation input data
+	V, R, S          *big.Int        // signature values
 }
 
 // NewTransaction creates an unsigned legacy transaction.
 // Deprecated: use NewTx instead.
 func NewTransaction(nonce uint64, to common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, mode byte) *Transaction {
 	return NewTx(&LegacyTx{
-		Mode: 	  mode,
+		Mode:     mode,
 		Nonce:    nonce,
 		To:       &to,
 		Value:    amount,
@@ -52,7 +55,7 @@ func NewTransaction(nonce uint64, to common.Address, amount *big.Int, gasLimit u
 // Deprecated: use NewTx instead.
 func NewContractCreation(nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, mode byte) *Transaction {
 	return NewTx(&LegacyTx{
-		Mode: 	  mode,
+		Mode:     mode,
 		Nonce:    nonce,
 		Value:    amount,
 		Gas:      gasLimit,
@@ -95,19 +98,27 @@ func (tx *LegacyTx) copy() TxData {
 }
 
 // accessors for innerTx.
-func (tx *LegacyTx) txMode() byte           { return tx.Mode }
-func (tx *LegacyTx) setMode(mode byte)      { tx.Mode = mode }
-func (tx *LegacyTx) txType() byte           { return LegacyTxType }
-func (tx *LegacyTx) chainID() *big.Int      { return deriveChainId(tx.V) }
-func (tx *LegacyTx) accessList() AccessList { return nil }
-func (tx *LegacyTx) data() []byte           { return tx.Data }
-func (tx *LegacyTx) gas() uint64            { return tx.Gas }
-func (tx *LegacyTx) gasPrice() *big.Int     { return tx.GasPrice }
-func (tx *LegacyTx) gasTipCap() *big.Int    { return tx.GasPrice }
-func (tx *LegacyTx) gasFeeCap() *big.Int    { return tx.GasPrice }
-func (tx *LegacyTx) value() *big.Int        { return tx.Value }
-func (tx *LegacyTx) nonce() uint64          { return tx.Nonce }
-func (tx *LegacyTx) to() *common.Address    { return tx.To }
+func (tx *LegacyTx) txMode() byte                    { return tx.Mode }
+func (tx *LegacyTx) txEncryptedData() []byte         { return tx.EncryptedData }
+func (tx *LegacyTx) setEncryptedData(data []byte)    { tx.EncryptedData = data }
+func (tx *LegacyTx) txEncryptedTo() []byte           { return tx.EncryptedTo }
+func (tx *LegacyTx) setEncryptedTo(data []byte)      { tx.EncryptedTo = data }
+func (tx *LegacyTx) txEncryptionPubkey() []byte      { return tx.EncryptionPubkey }
+func (tx *LegacyTx) setEncryptionPubkey(data []byte) { tx.EncryptionPubkey = data }
+func (tx *LegacyTx) setMode(mode byte)               { tx.Mode = mode }
+func (tx *LegacyTx) txType() byte                    { return LegacyTxType }
+func (tx *LegacyTx) chainID() *big.Int               { return deriveChainId(tx.V) }
+func (tx *LegacyTx) accessList() AccessList          { return nil }
+func (tx *LegacyTx) data() []byte                    { return tx.Data }
+func (tx *LegacyTx) gas() uint64                     { return tx.Gas }
+func (tx *LegacyTx) gasPrice() *big.Int              { return tx.GasPrice }
+func (tx *LegacyTx) gasTipCap() *big.Int             { return tx.GasPrice }
+func (tx *LegacyTx) gasFeeCap() *big.Int             { return tx.GasPrice }
+func (tx *LegacyTx) value() *big.Int                 { return tx.Value }
+func (tx *LegacyTx) nonce() uint64                   { return tx.Nonce }
+func (tx *LegacyTx) to() *common.Address             { return tx.To }
+func (tx *LegacyTx) setData(data []byte)             { tx.Data = data }
+func (tx *LegacyTx) setTo(to *common.Address)        { tx.To = to }
 
 func (tx *LegacyTx) rawSignatureValues() (v, r, s *big.Int) {
 	return tx.V, tx.R, tx.S

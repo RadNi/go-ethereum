@@ -71,6 +71,9 @@ type StateTransition struct {
 // Message represents a message sent to a contract.
 type Message interface {
 	Mode() byte
+	EncryptedTo() []byte
+	EncryptedData() []byte
+	EncryptionPubkey() []byte
 	From() common.Address
 	To() *common.Address
 
@@ -191,7 +194,11 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
 func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (*ExecutionResult, error) {
-	return NewStateTransition(evm, msg, gp).TransitionDb()
+	x := NewStateTransition(evm, msg, gp)
+	if msg.PrivateKey() != nil {
+		fmt.Printf("x: %v %v\n", msg.PrivateKey().X, msg.PrivateKey().PublicKey.Y)
+	}
+	return x.TransitionDb()
 }
 
 // to returns the recipient of the message.
@@ -315,6 +322,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	//if st.msg.Type() == types.EncryptedTxType {
 	mode := st.msg.Mode()
+	var decryptedTo []byte
 	log.Info("inja hastam")
 	log.Info(strconv.Itoa(int(mode)))
 	log.Info("radni: badesh")
@@ -327,16 +335,23 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	//log.Info(st.msg.Value())
 	if mode == types.Delayed {
 		log.Info("dare az koja miad?1")
+		prv := st.msg.PrivateKey()
+		fmt.Printf("via: %v %v\n", st.msg.PrivateKey().PublicKey.Y, st.msg.PrivateKey().X)
 		//prv := rsa.ImportPrivateKey()
-		decryptedData, e := elgamal.DecryptMulti(st.data, st.msg.PrivateKey())
+		decryptedData, e := elgamal.DecryptMulti(st.msg.EncryptedData(), types.CopyTimelockPrivatekey(prv))
 		if e != nil {
 			return nil, e
 		}
-		//decryptedTo := common.BytesToAddress(rsa.Decrypt((*st.msg.To()).Bytes(), prv))
+		fmt.Printf("this: %v\n", st.msg.EncryptedTo())
+		fmt.Printf("decrypted to: %v\n", decryptedTo)
+		fmt.Printf("via: %v %v\n", st.msg.PrivateKey().PublicKey.Y, st.msg.PrivateKey().X)
+		if e != nil {
+			return nil, e
+		}
 		st.data = decryptedData
-		st.msg.UpdateData(decryptedData)
-
-		//st.msg.UpdateTo(&decryptedTo)
+		//st.msg.UpdateData(decryptedData)
+		decryptedTo, _ = elgamal.DecryptMulti(st.msg.EncryptedTo(), types.CopyTimelockPrivatekey(prv))
+		fmt.Printf("after update: %v\n%v\n%v\n", st.msg.To(), st.msg.Data(), decryptedTo)
 		//st.msg.data = decryptedData
 		//st.msg.to = decryptedTo
 		//}
@@ -373,11 +388,16 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}
 
 	var (
-		msg              = st.msg
-		sender           = vm.AccountRef(msg.From())
-		rules            = st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber, st.evm.Context.Random != nil)
-		contractCreation = msg.To() == nil
+		msg    = st.msg
+		sender = vm.AccountRef(msg.From())
+		rules  = st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber, st.evm.Context.Random != nil)
 	)
+	var contractCreation bool
+	if mode == types.Delayed {
+		contractCreation = decryptedTo == nil
+	} else {
+		contractCreation = st.msg.To() == nil
+	}
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
 	var gas uint64 = 0
@@ -410,7 +430,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	// Set up the initial access list.
 	if rules.IsBerlin {
-		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
+		addr := common.BytesToAddress(decryptedTo)
+		st.state.PrepareAccessList(msg.From(), &addr, vm.ActivePrecompiles(rules), msg.AccessList())
 	}
 	var (
 		ret   []byte
@@ -423,7 +444,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		} else {
 			// Increment the nonce for the next transaction
 			st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-			ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+			addr := common.BytesToAddress(decryptedTo)
+			ret, st.gas, vmerr = st.evm.Call(sender, addr, st.data, st.gas, st.value)
 		}
 	case types.Encrypted:
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
@@ -434,11 +456,12 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			ret, _, st.gas, vmerr = st.evm.CreateDelayed(sender, st.data, st.gas, st.value, msg.Nonce())
 		} else {
 			log.Info("radni: executing delayed")
-			log.Info((*(st.evm.StateDB.GetBalance(st.to()))).String())
+			addr := common.BytesToAddress(decryptedTo)
+			log.Info((*(st.evm.StateDB.GetBalance(addr))).String())
 			// Increment the nonce for the next transaction
 			//st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-			ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
-			log.Info((*(st.evm.StateDB.GetBalance(st.to()))).String())
+			ret, st.gas, vmerr = st.evm.Call(sender, addr, st.data, st.gas, st.value)
+			log.Info((*(st.evm.StateDB.GetBalance(addr))).String())
 		}
 	}
 

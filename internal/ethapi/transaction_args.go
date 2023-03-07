@@ -35,6 +35,9 @@ import (
 // or a message call.
 type TransactionArgs struct {
 	Mode                 byte            `json:"mode"`
+	EncryptedTo          *hexutil.Bytes  `json:"encryptedTo"`
+	EncryptedData        *hexutil.Bytes  `json:"encryptedData"`
+	EncryptionPubkey     *hexutil.Bytes  `json:"encryptionPubkey"`
 	From                 *common.Address `json:"from"`
 	To                   *common.Address `json:"to"`
 	Gas                  *hexutil.Uint64 `json:"gas"`
@@ -61,6 +64,30 @@ func (args *TransactionArgs) from() common.Address {
 		return common.Address{}
 	}
 	return *args.From
+}
+
+// from retrieves the transaction sender address.
+func (args *TransactionArgs) encryptedTo() []byte {
+	if args.EncryptedTo != nil {
+		return *args.EncryptedTo
+	}
+	return nil
+}
+
+// from retrieves the transaction sender address.
+func (args *TransactionArgs) encryptedData() []byte {
+	if args.EncryptedData != nil {
+		return *args.EncryptedData
+	}
+	return nil
+}
+
+// from retrieves the transaction sender address.
+func (args *TransactionArgs) encryptionPubkey() []byte {
+	if args.EncryptionPubkey != nil {
+		return *args.EncryptionPubkey
+	}
+	return nil
 }
 
 // data retrieves the transaction calldata. Input field is preferred.
@@ -283,16 +310,19 @@ func (args *TransactionArgs) toTransaction() *types.Transaction {
 			al = *args.AccessList
 		}
 		data = &types.DynamicFeeTx{
-			Mode:       args.Mode,
-			To:         args.To,
-			ChainID:    (*big.Int)(args.ChainID),
-			Nonce:      uint64(*args.Nonce),
-			Gas:        uint64(*args.Gas),
-			GasFeeCap:  (*big.Int)(args.MaxFeePerGas),
-			GasTipCap:  (*big.Int)(args.MaxPriorityFeePerGas),
-			Value:      (*big.Int)(args.Value),
-			Data:       args.data(),
-			AccessList: al,
+			Mode:             args.Mode,
+			EncryptedData:    args.encryptedData(),
+			EncryptedTo:      args.encryptedTo(),
+			EncryptionPubkey: args.encryptionPubkey(),
+			To:               args.To,
+			ChainID:          (*big.Int)(args.ChainID),
+			Nonce:            uint64(*args.Nonce),
+			Gas:              uint64(*args.Gas),
+			GasFeeCap:        (*big.Int)(args.MaxFeePerGas),
+			GasTipCap:        (*big.Int)(args.MaxPriorityFeePerGas),
+			Value:            (*big.Int)(args.Value),
+			Data:             args.data(),
+			AccessList:       al,
 		}
 	case args.AccessList != nil:
 		data = &types.AccessListTx{

@@ -23,16 +23,19 @@ import (
 )
 
 type DynamicFeeTx struct {
-	Mode 	   byte
-	ChainID    *big.Int
-	Nonce      uint64
-	GasTipCap  *big.Int // a.k.a. maxPriorityFeePerGas
-	GasFeeCap  *big.Int // a.k.a. maxFeePerGas
-	Gas        uint64
-	To         *common.Address `rlp:"nil"` // nil means contract creation
-	Value      *big.Int
-	Data       []byte
-	AccessList AccessList
+	Mode             byte
+	EncryptedTo      []byte
+	EncryptedData    []byte
+	EncryptionPubkey []byte
+	ChainID          *big.Int
+	Nonce            uint64
+	GasTipCap        *big.Int // a.k.a. maxPriorityFeePerGas
+	GasFeeCap        *big.Int // a.k.a. maxFeePerGas
+	Gas              uint64
+	To               *common.Address `rlp:"nil"` // nil means contract creation
+	Value            *big.Int
+	Data             []byte
+	AccessList       AccessList
 
 	// Signature values
 	V *big.Int `json:"v" gencodec:"required"`
@@ -43,11 +46,14 @@ type DynamicFeeTx struct {
 // copy creates a deep copy of the transaction data and initializes all fields.
 func (tx *DynamicFeeTx) copy() TxData {
 	cpy := &DynamicFeeTx{
-		Mode: tx.Mode,
-		Nonce: tx.Nonce,
-		To:    copyAddressPtr(tx.To),
-		Data:  common.CopyBytes(tx.Data),
-		Gas:   tx.Gas,
+		Mode:             tx.Mode,
+		EncryptedTo:      tx.EncryptedTo,
+		EncryptedData:    tx.EncryptedData,
+		EncryptionPubkey: tx.EncryptionPubkey,
+		Nonce:            tx.Nonce,
+		To:               copyAddressPtr(tx.To),
+		Data:             common.CopyBytes(tx.Data),
+		Gas:              tx.Gas,
 		// These are copied below.
 		AccessList: make(AccessList, len(tx.AccessList)),
 		Value:      new(big.Int),
@@ -84,19 +90,28 @@ func (tx *DynamicFeeTx) copy() TxData {
 }
 
 // accessors for innerTx.
-func (tx *DynamicFeeTx) txMode() byte           { return tx.Mode }
-func (tx *DynamicFeeTx) setMode(mode byte)      { tx.Mode = mode }
-func (tx *DynamicFeeTx) txType() byte           { return DynamicFeeTxType }
-func (tx *DynamicFeeTx) chainID() *big.Int      { return tx.ChainID }
-func (tx *DynamicFeeTx) accessList() AccessList { return tx.AccessList }
-func (tx *DynamicFeeTx) data() []byte           { return tx.Data }
-func (tx *DynamicFeeTx) gas() uint64            { return tx.Gas }
-func (tx *DynamicFeeTx) gasFeeCap() *big.Int    { return tx.GasFeeCap }
-func (tx *DynamicFeeTx) gasTipCap() *big.Int    { return tx.GasTipCap }
-func (tx *DynamicFeeTx) gasPrice() *big.Int     { return tx.GasFeeCap }
-func (tx *DynamicFeeTx) value() *big.Int        { return tx.Value }
-func (tx *DynamicFeeTx) nonce() uint64          { return tx.Nonce }
-func (tx *DynamicFeeTx) to() *common.Address    { return tx.To }
+func (tx *DynamicFeeTx) txMode() byte                   { return tx.Mode }
+func (tx *DynamicFeeTx) txEncryptedData() []byte        { return tx.EncryptedData }
+func (tx *DynamicFeeTx) setEncryptedData(data []byte)   { tx.EncryptedData = data }
+func (tx *DynamicFeeTx) txEncryptedTo() []byte          { return tx.EncryptedTo }
+func (tx *DynamicFeeTx) setEncryptedTo(to []byte)       { tx.EncryptedTo = to }
+func (tx *DynamicFeeTx) txEncryptionPubkey() []byte     { return tx.EncryptionPubkey }
+func (tx *DynamicFeeTx) setEncryptionPubkey(pub []byte) { tx.EncryptionPubkey = pub }
+func (tx *DynamicFeeTx) setMode(mode byte)              { tx.Mode = mode }
+func (tx *DynamicFeeTx) txType() byte                   { return DynamicFeeTxType }
+func (tx *DynamicFeeTx) chainID() *big.Int              { return tx.ChainID }
+func (tx *DynamicFeeTx) accessList() AccessList         { return tx.AccessList }
+func (tx *DynamicFeeTx) data() []byte                   { return tx.Data }
+func (tx *DynamicFeeTx) gas() uint64                    { return tx.Gas }
+func (tx *DynamicFeeTx) gasFeeCap() *big.Int            { return tx.GasFeeCap }
+func (tx *DynamicFeeTx) gasTipCap() *big.Int            { return tx.GasTipCap }
+func (tx *DynamicFeeTx) gasPrice() *big.Int             { return tx.GasFeeCap }
+func (tx *DynamicFeeTx) value() *big.Int                { return tx.Value }
+func (tx *DynamicFeeTx) nonce() uint64                  { return tx.Nonce }
+func (tx *DynamicFeeTx) to() *common.Address            { return tx.To }
+func (tx *DynamicFeeTx) setData(data []byte)            { tx.Data = data }
+
+func (tx *DynamicFeeTx) setTo(to *common.Address) { tx.To = to }
 
 func (tx *DynamicFeeTx) rawSignatureValues() (v, r, s *big.Int) {
 	return tx.V, tx.R, tx.S

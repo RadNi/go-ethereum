@@ -20,7 +20,6 @@ package core
 import (
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"math/big"
 	"sort"
@@ -1365,8 +1364,6 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 	}
 	// Set new head.
 	if status == CanonStatTy {
-		fmt.Printf("writeHeadBlock: \n")
-		spew.Dump(block.Header().TimelockPublicKey)
 		bc.writeHeadBlock(block)
 	}
 	bc.futureBlocks.Remove(block.Hash())

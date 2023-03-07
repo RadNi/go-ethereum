@@ -17,10 +17,10 @@
 package miner
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -95,25 +95,29 @@ type environment struct {
 	gasPool   *core.GasPool  // available gas used to pack transactions
 	coinbase  common.Address
 
-	header             *types.Header
-	txs                []*types.Transaction
-	receipts           []*types.Receipt
-	uncles             map[common.Hash]*types.Header
-	timelockPrivateKey *types.ElgamalPrivateKey
+	header              *types.Header
+	txs                 []*types.Transaction
+	receipts            []*types.Receipt
+	uncles              map[common.Hash]*types.Header
+	timelockPrivateKeys []*types.ElgamalPrivateKey
 }
 
 // copy creates a deep copy of environment.
 func (env *environment) copy() *environment {
+	prvkeys := make([]*types.ElgamalPrivateKey, len(env.timelockPrivateKeys))
+	for _, p := range env.timelockPrivateKeys {
+		prvkeys = append(prvkeys, copyElgamalPrivateKey(p))
+	}
 	cpy := &environment{
-		signer:             env.signer,
-		state:              env.state.Copy(),
-		ancestors:          env.ancestors.Clone(),
-		family:             env.family.Clone(),
-		tcount:             env.tcount,
-		coinbase:           env.coinbase,
-		header:             types.CopyHeader(env.header),
-		receipts:           copyReceipts(env.receipts),
-		timelockPrivateKey: copyRSAPrivateKey(env.timelockPrivateKey),
+		signer:              env.signer,
+		state:               env.state.Copy(),
+		ancestors:           env.ancestors.Clone(),
+		family:              env.family.Clone(),
+		tcount:              env.tcount,
+		coinbase:            env.coinbase,
+		header:              types.CopyHeader(env.header),
+		receipts:            copyReceipts(env.receipts),
+		timelockPrivateKeys: prvkeys,
 	}
 	if env.gasPool != nil {
 		gasPool := *env.gasPool
@@ -772,14 +776,14 @@ func (w *worker) makeEnv(parent *types.Block, header *types.Header, coinbase com
 
 	// Note the passed coinbase may be different with header.Coinbase.
 	env := &environment{
-		signer:             types.MakeSigner(w.chainConfig, header.Number),
-		state:              state,
-		coinbase:           coinbase,
-		ancestors:          mapset.NewSet(),
-		family:             mapset.NewSet(),
-		header:             header,
-		uncles:             make(map[common.Hash]*types.Header),
-		timelockPrivateKey: timelockPrivateKey,
+		signer:              types.MakeSigner(w.chainConfig, header.Number),
+		state:               state,
+		coinbase:            coinbase,
+		ancestors:           mapset.NewSet(),
+		family:              mapset.NewSet(),
+		header:              header,
+		uncles:              make(map[common.Hash]*types.Header),
+		timelockPrivateKeys: []*types.ElgamalPrivateKey{timelockPrivateKey},
 	}
 	// when 08 is processed ancestors contain 07 (quick block)
 	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {
@@ -836,8 +840,21 @@ func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*
 	snap := env.state.Snapshot()
 
 	log.Info("radni: inja transaction ro regularly add mikone be block ba tavajoh be parametr haii ke az beacon-chain miad")
+	var prv *types.ElgamalPrivateKey
+	if tx.Mode() == types.Delayed {
+		for _, p := range env.timelockPrivateKeys {
+			if bytes.Compare(p.PublicKey.Y, tx.EncryptionPubkey()) == 0 {
+				prv = p
+			}
+		}
 
-	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig(), env.timelockPrivateKey)
+		if prv == nil {
+			log.Error("Couldn't find privatekey when applying the transaction.")
+			return nil, errors.New("couldn't find privatekey when applying the transaction")
+		}
+	}
+
+	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig(), prv)
 	if err != nil {
 		log.Info("radni: error khord?1")
 		env.state.RevertToSnapshot(snap)
@@ -988,6 +1005,18 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 		//
 		// We use the eip155 signer regardless of the current hf.
 		from, _ := types.Sender(env.signer, tx)
+		//fmt.Printf("frommmm1: %v\n", from)
+		//tx = w.encryptTransaction(env, tx)
+		//fmt.Printf("from before: %v\n")
+		//
+		//b, _ := tx.MarshalBinary()
+		//tx2 := new(types.Transaction)
+		//tx2.UnmarshalBinary(b)
+		//from2, _ := types.Sender(env.signer, tx2)
+		//fmt.Printf("afterrrr: %v\n", from2)
+		//
+		//from, _ = types.Sender(env.signer, tx)
+		//fmt.Printf("frommmm2: %v\n", from)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.chainConfig.IsEIP155(env.header.Number) {
@@ -1170,6 +1199,47 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 	return env, nil
 }
 
+//func (w *worker) encryptTransaction(env *environment, tx *types.Transaction) *types.Transaction {
+//	if env == nil || env.header == nil || env.header.TimelockPublicKey == nil {
+//		return tx
+//	}
+//	num := env.header.Number.Uint64()
+//	if num < 10 {
+//		return tx
+//	}
+//	if tx.Mode() != types.Normal {
+//		return tx
+//	}
+//	pub := env.header.TimelockPublicKey
+//	fmt.Printf("Encrypting with the block number %v publickey: %v\n", num, pub.Y)
+//
+//	var encrypted hexutil.Bytes
+//	var y hexutil.Bytes
+//	var e error
+//	encrypted, e = elgamal.EncryptMulti(tx.Data(), pub)
+//	if e != nil {
+//		return tx
+//	}
+//	log.Info(encrypted.String())
+//	tx.SetEncryptedData(encrypted)
+//	tx.SetData(nil)
+//	encrypted, e = elgamal.EncryptMulti(tx.To().Bytes(), pub)
+//	fmt.Printf("encrypting %v\n", tx.To().Bytes())
+//	fmt.Printf("to %v\n", encrypted)
+//	fmt.Printf("via %v\n", pub.Y)
+//	if e != nil {
+//		return tx
+//	}
+//	tx.SetEncryptedTo(encrypted)
+//	tx.SetTo(nil)
+//	y = pub.Y
+//	tx.SetEncryptionPubkey(y)
+//	log.Info("radni: man injam3")
+//	log.Info(encrypted.String())
+//	tx.SetMode(types.Encrypted)
+//	return tx
+//}
+
 // fillTransactions retrieves the pending transactions from the txpool and fills them
 // into the given sealing block. The transaction selection and ordering strategy can
 // be customized with the plugin in the future.
@@ -1207,15 +1277,32 @@ func (w *worker) generateWork(params *generateParams) (*types.Block, error) {
 	}
 	defer work.discard()
 
-	currentLen := w.chain.CurrentBlock().NumberU64()
+	currentLen := w.chain.CurrentHeader().Number.Uint64()
 	if !params.noTxs {
-		if currentLen >= 10 {
-			var delay uint64 = 2
+		if currentLen >= 12 {
+			var delay uint64 = 4
 			// Activate encryption
 			b := w.chain.GetBlockByNumber(currentLen - delay)
+			prv1 := work.timelockPrivateKeys[0]
+			prv2 := w.chain.GetBlockByNumber(currentLen).TimelockPrivatekey()
+			prv3 := w.chain.GetBlockByNumber(currentLen - 1).TimelockPrivatekey()
+			fmt.Printf("adding block number %v %v transactions\n", b.Number().Uint64(), b.Transactions().Len())
 			var txs types.Transactions
 			for _, tx := range b.Transactions() {
 				if tx.Mode() == types.Encrypted {
+					if bytes.Compare(tx.EncryptionPubkey(), prv1.PublicKey.Y) == 0 {
+						fmt.Printf("Found privatekey corresponding to %v", prv1.PublicKey.Y)
+					} else if bytes.Compare(tx.EncryptionPubkey(), prv2.PublicKey.Y) == 0 {
+						fmt.Printf("Found privatekey corresponding to %v", prv2.PublicKey.Y)
+						work.timelockPrivateKeys = append(work.timelockPrivateKeys, prv2)
+					} else if bytes.Compare(tx.EncryptionPubkey(), prv3.PublicKey.Y) == 0 {
+						fmt.Printf("Found privatekey corresponding to %v", prv3.PublicKey.Y)
+						work.timelockPrivateKeys = append(work.timelockPrivateKeys, prv3)
+					} else {
+						log.Error("too late to include this transaction.")
+						fmt.Printf("2 Couldn't find the publicKey %v\n%v\n%v\n", tx.EncryptionPubkey(), prv1.PublicKey.Y, prv2.PublicKey.Y)
+						continue
+					}
 					temp := tx.Copy()
 					(*temp).SetMode(types.Delayed)
 					txs = append(txs, temp)
@@ -1227,11 +1314,6 @@ func (w *worker) generateWork(params *generateParams) (*types.Block, error) {
 				fmt.Println(err)
 				return nil, err
 			}
-		}
-		log.Info("radni: pass az inja rad mishe")
-		log.Info(strconv.FormatUint(currentLen, 10))
-		if currentLen >= 5 {
-			fmt.Println(len(w.chain.GetBlockByNumber(currentLen - 2).Transactions()))
 		}
 		w.fillTransactions(nil, work)
 	}
@@ -1371,7 +1453,7 @@ func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
 	return result
 }
 
-func copyRSAPrivateKey(prvKey *types.ElgamalPrivateKey) *types.ElgamalPrivateKey {
+func copyElgamalPrivateKey(prvKey *types.ElgamalPrivateKey) *types.ElgamalPrivateKey {
 	N := &prvKey
 	return *N
 }

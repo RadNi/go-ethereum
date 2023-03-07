@@ -44,7 +44,7 @@ func (al AccessList) StorageKeys() int {
 
 // AccessListTx is the data of EIP-2930 access list transactions.
 type AccessListTx struct {
-	Mode	   byte
+	Mode       byte
 	ChainID    *big.Int        // destination chain ID
 	Nonce      uint64          // nonce of sender account
 	GasPrice   *big.Int        // wei per gas
@@ -95,19 +95,27 @@ func (tx *AccessListTx) copy() TxData {
 }
 
 // accessors for innerTx.
-func (tx *AccessListTx) txMode() byte           { return Normal }
-func (tx *AccessListTx) setMode(mode byte)      { tx.Mode = mode }
-func (tx *AccessListTx) txType() byte           { return AccessListTxType }
-func (tx *AccessListTx) chainID() *big.Int      { return tx.ChainID }
-func (tx *AccessListTx) accessList() AccessList { return tx.AccessList }
-func (tx *AccessListTx) data() []byte           { return tx.Data }
-func (tx *AccessListTx) gas() uint64            { return tx.Gas }
-func (tx *AccessListTx) gasPrice() *big.Int     { return tx.GasPrice }
-func (tx *AccessListTx) gasTipCap() *big.Int    { return tx.GasPrice }
-func (tx *AccessListTx) gasFeeCap() *big.Int    { return tx.GasPrice }
-func (tx *AccessListTx) value() *big.Int        { return tx.Value }
-func (tx *AccessListTx) nonce() uint64          { return tx.Nonce }
-func (tx *AccessListTx) to() *common.Address    { return tx.To }
+func (tx *AccessListTx) txMode() byte                   { return Normal }
+func (tx *AccessListTx) setMode(mode byte)              { tx.Mode = mode }
+func (tx *AccessListTx) txType() byte                   { return AccessListTxType }
+func (tx *AccessListTx) chainID() *big.Int              { return tx.ChainID }
+func (tx *AccessListTx) accessList() AccessList         { return tx.AccessList }
+func (tx *AccessListTx) data() []byte                   { return tx.Data }
+func (tx *AccessListTx) setData(data []byte)            { tx.Data = data }
+func (tx *AccessListTx) gas() uint64                    { return tx.Gas }
+func (tx *AccessListTx) gasPrice() *big.Int             { return tx.GasPrice }
+func (tx *AccessListTx) gasTipCap() *big.Int            { return tx.GasPrice }
+func (tx *AccessListTx) gasFeeCap() *big.Int            { return tx.GasPrice }
+func (tx *AccessListTx) txEncryptedData() []byte        { return tx.Data }
+func (tx *AccessListTx) setEncryptedData(data []byte)   { tx.Data = data }
+func (tx *AccessListTx) txEncryptedTo() []byte          { return tx.To.Bytes() }
+func (tx *AccessListTx) setEncryptedTo(to []byte)       { tx.To.SetBytes(to) }
+func (tx *AccessListTx) txEncryptionPubkey() []byte     { return nil }
+func (tx *AccessListTx) setEncryptionPubkey(pub []byte) {}
+func (tx *AccessListTx) value() *big.Int                { return tx.Value }
+func (tx *AccessListTx) nonce() uint64                  { return tx.Nonce }
+func (tx *AccessListTx) to() *common.Address            { return tx.To }
+func (tx *AccessListTx) setTo(to *common.Address)       { tx.To = to }
 
 func (tx *AccessListTx) rawSignatureValues() (v, r, s *big.Int) {
 	return tx.V, tx.R, tx.S
