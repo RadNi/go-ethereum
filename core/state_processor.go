@@ -19,8 +19,6 @@ package core
 import (
 	"bytes"
 	"fmt"
-	"math/big"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
@@ -30,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"math/big"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -83,10 +82,12 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 
 		pb = p.bc.GetBlockByNumber(header.Number.Uint64() - 5)
 
-		fmt.Printf("iterating over block number %v %v\n", pb.Number(), pb.Transactions().Len())
 		if bytes.Compare(header.TimelockPrivatekey.PublicKey.Y, pb.TimelockPublickey().Y) != 0 {
-			log.Error("The privatekey doesn't match with the fifth last publickey.")
-			fmt.Printf("Privatekey: %v\npublickey: %v\n", header.TimelockPrivatekey.PublicKey.Y[:16], pb.TimelockPublickey().Y[:16])
+			context := []interface{}{
+				"prvkey", header.TimelockPrivatekey.PublicKey.Y,
+				"pubkey", pb.TimelockPublickey().Y,
+			}
+			log.Error("The privatekey doesn't match with the fifth last publickey.", context)
 		}
 
 		var orderedEncryptedTransaction types.Transactions
@@ -116,29 +117,22 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 				return nil, nil, 0, fmt.Errorf("after the transition, tx of Normal type is not allowed tx %d [%v]", i, tx.Hash().Hex())
 			}
 		}
-		fmt.Printf("executing %v\n", tx.Hash())
 		var prv *types.ElgamalPrivateKey
 		if tx.Mode() == types.Delayed {
 			prv1 := header.TimelockPrivatekey
-			fmt.Printf("got the private key 1\n")
 			prv2 := p.bc.GetBlockByNumber(header.Number.Uint64() - 1).Header().TimelockPrivatekey
-			fmt.Printf("got the private key 2\n")
 			prv3 := p.bc.GetBlockByNumber(header.Number.Uint64() - 2).Header().TimelockPrivatekey
-			fmt.Printf("got the private key 3\n")
 			if bytes.Compare(tx.EncryptionPubkey(), prv1.PublicKey.Y) == 0 {
 				prv = prv1
-				fmt.Printf("Found privatekey corresponding to %v", header.Number)
 			} else if bytes.Compare(tx.EncryptionPubkey(), prv2.PublicKey.Y) == 0 {
 				prv = prv2
 				fmt.Printf("Found privatekey corresponding to %v", header.Number.Uint64()-1)
 			} else if bytes.Compare(tx.EncryptionPubkey(), prv3.PublicKey.Y) == 0 {
 				prv = prv3
-				fmt.Printf("Found privatekey corresponding to %v", header.Number.Uint64()-2)
 			} else {
 				fmt.Printf("1. Couldn't find the publicKey %v\n%v\n%v\n", tx.EncryptionPubkey(), prv1.PublicKey.Y, prv2.PublicKey.Y)
 			}
 			//if prv != nil || tx.Mode() != types.Delayed {
-			fmt.Printf("arrived here\n")
 			if prv != nil {
 				fmt.Printf("unlocking with: %v for %v\n", prv.X, header.Number)
 			}
@@ -171,7 +165,8 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, author *com
 	// Apply the transaction to the current state (included in the env).
 	result, err := ApplyMessage(evm, msg, gp)
 	if err != nil {
-		log.Info("radni: ApplyMessage result errored ")
+		fmt.Printf("%v\n", err)
+		log.Error("radni: ApplyMessage result errored ")
 		return nil, err
 	}
 

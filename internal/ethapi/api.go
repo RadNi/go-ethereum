@@ -962,7 +962,6 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 
 	// Execute the message.
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
-	log.Info("diriid")
 	result, err := core.ApplyMessage(evm, msg, gp)
 	if err := vmError(); err != nil {
 		return nil, err
@@ -1682,12 +1681,20 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	if err != nil {
 		return common.Hash{}, err
 	}
+	var mode string
+	if tx.Mode() == types.Normal {
+		mode = "normal"
+	} else if tx.Mode() == types.Delayed {
+		mode = "delayed"
+	} else {
+		mode = "encrypted"
+	}
 
 	if tx.To() == nil && tx.EncryptedTo() == nil {
 		addr := crypto.CreateAddress(from, tx.Nonce())
-		log.Info("Submitted contract creation", "hash", tx.Hash().Hex(), "from", from, "nonce", tx.Nonce(), "contract", addr.Hex(), "value", tx.Value())
+		log.Info("Submitted contract creation", "hash", tx.Hash().Hex(), "from", from, "nonce", tx.Nonce(), "contract", addr.Hex(), "value", tx.Value(), "mode", mode)
 	} else {
-		log.Info("Submitted transaction", "hash", tx.Hash().Hex(), "from", from, "nonce", tx.Nonce(), "recipient", tx.To(), "value", tx.Value())
+		log.Info("Submitted transaction", "hash", tx.Hash().Hex(), "from", from, "nonce", tx.Nonce(), "recipient", tx.To(), "value", tx.Value(), "mode", mode)
 	}
 	return tx.Hash(), nil
 }
@@ -1718,7 +1725,6 @@ func (s *TransactionAPI) SendTransaction(ctx context.Context, args TransactionAr
 	//if *args.To == common.HexToAddress("0xaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeea") {
 	bn := s.b.CurrentHeader().Number.Int64()
 	pub := s.GetBlockTimelockPublicKeyByNumber(ctx, rpc.BlockNumber(bn))
-	fmt.Printf("Encrypting with the block number %v publickey:", bn)
 
 	var encrypted hexutil.Bytes
 	var y hexutil.Bytes
@@ -1727,13 +1733,9 @@ func (s *TransactionAPI) SendTransaction(ctx context.Context, args TransactionAr
 	if e != nil {
 		return common.Hash{}, e
 	}
-	log.Info(encrypted.String())
 	args.EncryptedData = &encrypted
 	args.Data = nil
 	encrypted, e = elgamal.EncryptMulti(args.To.Bytes(), pub)
-	fmt.Printf("encrypting %v\n", args.To.Bytes())
-	fmt.Printf("to %v\n", encrypted)
-	fmt.Printf("via %v\n", pub.Y)
 	if e != nil {
 		return common.Hash{}, e
 	}
@@ -1741,14 +1743,6 @@ func (s *TransactionAPI) SendTransaction(ctx context.Context, args TransactionAr
 	args.To = nil
 	y = pub.Y
 	args.EncryptionPubkey = &y
-	//encryptedToNotCropped := rsa.Encrypt(args.To.Bytes(), pub)
-	//encryptedTo := common.BytesToAddress(encryptedToNotCropped)
-	//args.To = &encryptedTo
-	log.Info("radni: man injam3")
-	log.Info(encrypted.String())
-	//log.Info((*args.To).Hex())
-	//fmt.Printf("Ciphertext: %x\n", encryptedToNotCropped)
-	//}
 	// Assemble the transaction and sign with the wallet
 	args.Mode = types.Encrypted
 	tx := args.toTransaction()

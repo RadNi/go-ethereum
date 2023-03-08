@@ -178,12 +178,8 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.precompile(addr)
 
-	log.Info("radni: call")
-
 	if !evm.StateDB.Exist(addr) {
-		log.Info("radni: address not exist")
 		if !isPrecompile && evm.chainRules.IsEIP158 && value.Sign() == 0 {
-			log.Info("radni: into")
 			// Calling a non existing account, don't do anything, but ping the tracer
 			if evm.Config.Debug {
 				if evm.depth == 0 {
@@ -224,7 +220,6 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		// The contract is a scoped environment for this execution context only.
 		code := evm.StateDB.GetCode(addr)
 		if len(code) == 0 {
-			log.Info("radni: len is 0")
 			ret, err = nil, nil // gas is unchanged
 		} else {
 			addrCopy := addr

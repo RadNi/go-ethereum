@@ -163,8 +163,6 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 	api.forkchoiceLock.Lock()
 	defer api.forkchoiceLock.Unlock()
 
-	fmt.Printf("hamin avale kar too ForkChoice: %v\n", payloadAttributes.TimelockPrivatekey.PublicKey.Y[:16])
-
 	log.Trace("Engine API request received", "method", "ForkchoiceUpdated", "head", update.HeadBlockHash, "finalized", update.FinalizedBlockHash, "safe", update.SafeBlockHash)
 	if update.HeadBlockHash == (common.Hash{}) {
 		log.Warn("Forkchoice requested update to zero hash")
@@ -286,7 +284,6 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 	// sealed by the beacon client. The payload will be requested later, and we
 	// might replace it arbitrarily many times in between.
 	if payloadAttributes != nil {
-		fmt.Printf("before getSealings: \n")
 		h := api.eth.BlockChain().CurrentHeader()
 		if payloadAttributes.TimelockPrivatekey != nil && h.Number.Uint64() >= 12 {
 			b := api.eth.BlockChain().GetBlockByNumber(h.Number.Uint64() - 4) // TODO why it should be less than delay by one?!
@@ -308,8 +305,6 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 			return valid(nil), beacon.InvalidPayloadAttributes.With(err)
 		}
 		id := computePayloadId(update.HeadBlockHash, payloadAttributes)
-		log.Info("radni: api.localBlocks.put, inja bayad block ro shoro kone por kardan baraie:")
-		log.Info(id.String())
 		api.localBlocks.put(id, &payload{empty: empty, result: resCh})
 		return valid(&id), nil
 	}
@@ -349,8 +344,6 @@ func (api *ConsensusAPI) ExchangeTransitionConfigurationV1(config beacon.Transit
 // GetPayloadV1 returns a cached payload by id.
 func (api *ConsensusAPI) GetPayloadV1(payloadID beacon.PayloadID) (*beacon.ExecutableDataV1, error) {
 	log.Trace("Engine API request received", "method", "GetPayload", "id", payloadID)
-	log.Info("radni:")
-	log.Info(payloadID.String())
 	data := api.localBlocks.get(payloadID)
 	if data == nil {
 		return nil, beacon.UnknownPayload
@@ -360,7 +353,6 @@ func (api *ConsensusAPI) GetPayloadV1(payloadID beacon.PayloadID) (*beacon.Execu
 
 // NewPayloadV1 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
 func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
-	fmt.Printf("newPayload params: \n")
 	log.Trace("Engine API request received", "method", "ExecutePayload", "number", params.Number, "hash", params.BlockHash)
 	block, err := beacon.ExecutableDataToBlock(params)
 	if err != nil {

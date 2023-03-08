@@ -48,15 +48,25 @@ func (st *insertStats) report(chain []*types.Block, index int, dirty common.Stor
 	// If we're at the last block of the batch or report period reached, log
 	if index == len(chain)-1 || elapsed >= statsReportLimit {
 		// Count the number of transactions in this segment
-		var txs int
+		var txsD int
+		var txsE int
+		var txsN int
 		for _, block := range chain[st.lastIndex : index+1] {
-			txs += len(block.Transactions())
+			for _, tx := range block.Transactions() {
+				if tx.Mode() == types.Normal {
+					txsN += 1
+				} else if tx.Mode() == types.Encrypted {
+					txsE += 1
+				} else {
+					txsD += 1
+				}
+			}
 		}
 		end := chain[index]
 
 		// Assemble the log context and send it to the logger
 		context := []interface{}{
-			"blocks", st.processed, "txs", txs, "mgas", float64(st.usedGas) / 1000000,
+			"blocks", st.processed, "txs_normal", txsN, "txs_delayed", txsD, "txs_encrypted", txsE, "mgas", float64(st.usedGas) / 1000000,
 			"elapsed", common.PrettyDuration(elapsed), "mgasps", float64(st.usedGas) * 1000 / float64(elapsed),
 			"number", end.Number(), "hash", end.Hash(),
 		}

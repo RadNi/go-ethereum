@@ -538,12 +538,9 @@ func (w *worker) mainLoop() {
 	for {
 		select {
 		case req := <-w.newWorkCh:
-			log.Info("newWorkCh")
 			w.commitWork(req.interrupt, req.noempty, req.timestamp)
 
 		case req := <-w.getWorkCh:
-			log.Info("generating work")
-			fmt.Printf("pubKey: %v prvKey: %v\n", req.params.timelockPublicKey.Y, req.params.timelockPrivateKey.X)
 			block, err := w.generateWork(req.params)
 			if err != nil {
 				req.err <- err
@@ -553,7 +550,6 @@ func (w *worker) mainLoop() {
 				req.result <- block
 			}
 		case ev := <-w.chainSideCh:
-			log.Info("chainSideCh")
 			// Short circuit for duplicate side blocks
 			if _, exist := w.localUncles[ev.Block.Hash()]; exist {
 				continue
@@ -578,7 +574,6 @@ func (w *worker) mainLoop() {
 			}
 
 		case <-cleanTicker.C:
-			log.Info("cleanTicker")
 			chainHead := w.chain.CurrentBlock()
 			for hash, uncle := range w.localUncles {
 				if uncle.NumberU64()+staleThreshold <= chainHead.NumberU64() {
@@ -597,7 +592,6 @@ func (w *worker) mainLoop() {
 			// Note all transactions received may not be continuous with transactions
 			// already included in the current sealing block. These transactions will
 			// be automatically eliminated.
-			log.Info("txsCh")
 			if !w.isRunning() && w.current != nil {
 				// If block is already full, abort
 				if gp := w.current.gasPool; gp != nil && gp.Gas() < params.TxGas {
@@ -839,7 +833,6 @@ func (w *worker) updateSnapshot(env *environment) {
 func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*types.Log, error) {
 	snap := env.state.Snapshot()
 
-	log.Info("radni: inja transaction ro regularly add mikone be block ba tavajoh be parametr haii ke az beacon-chain miad")
 	var prv *types.ElgamalPrivateKey
 	if tx.Mode() == types.Delayed {
 		for _, p := range env.timelockPrivateKeys {
@@ -856,7 +849,6 @@ func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*
 
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig(), prv)
 	if err != nil {
-		log.Info("radni: error khord?1")
 		env.state.RevertToSnapshot(snap)
 		return nil, err
 	}
@@ -916,8 +908,6 @@ func (w *worker) commitDelayedTransactions(env *environment, txs types.Transacti
 
 		//(*tx).SetMode(types.Delayed)
 
-		log.Info("radni: Executing delayed transaction:")
-		log.Info(tx.Hash().Hex())
 		logs, err := w.commitTransaction(env, tx)
 		//(*tx).SetMode(types.Encrypted) // TODO It needs to be immutable. Other requests might fail. Need to use Message instead of trx
 		switch {
@@ -931,7 +921,6 @@ func (w *worker) commitDelayedTransactions(env *environment, txs types.Transacti
 			coalescedLogs = append(coalescedLogs, logs...)
 			env.tcount++
 			txs = txs[1:]
-			log.Info("radni: It was appended ...")
 		default:
 			log.Info("Transaction failed")
 			fmt.Println(err)
@@ -1150,11 +1139,9 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 		header.MixDigest = genParams.random
 	}
 	if genParams.timelockPrivateKey != nil {
-		fmt.Printf("set timelockPrivateKey\n")
 		header.TimelockPrivatekey = types.CopyTimelockPrivatekey(genParams.timelockPrivateKey)
 	}
 	if genParams.timelockPublicKey != nil {
-		fmt.Printf("set timelockPublicKey\n")
 		header.TimelockPublicKey = types.CopyTimelockPublickey(genParams.timelockPublicKey)
 	}
 	// Set baseFee and GasLimit if we are on an EIP-1559 chain
@@ -1286,38 +1273,32 @@ func (w *worker) generateWork(params *generateParams) (*types.Block, error) {
 			prv1 := work.timelockPrivateKeys[0]
 			prv2 := w.chain.GetBlockByNumber(currentLen).TimelockPrivatekey()
 			prv3 := w.chain.GetBlockByNumber(currentLen - 1).TimelockPrivatekey()
-			fmt.Printf("adding block number %v %v transactions\n", b.Number().Uint64(), b.Transactions().Len())
+			if b.Transactions().Len() > 0 {
+				log.Info("Adding past block's transactions\n", "block", b.Number().Uint64(), "tx number", b.Transactions().Len())
+			}
 			var txs types.Transactions
 			for _, tx := range b.Transactions() {
 				if tx.Mode() == types.Encrypted {
-					if bytes.Compare(tx.EncryptionPubkey(), prv1.PublicKey.Y) == 0 {
-						fmt.Printf("Found privatekey corresponding to %v", prv1.PublicKey.Y)
-					} else if bytes.Compare(tx.EncryptionPubkey(), prv2.PublicKey.Y) == 0 {
-						fmt.Printf("Found privatekey corresponding to %v", prv2.PublicKey.Y)
+					if bytes.Compare(tx.EncryptionPubkey(), prv2.PublicKey.Y) == 0 {
 						work.timelockPrivateKeys = append(work.timelockPrivateKeys, prv2)
 					} else if bytes.Compare(tx.EncryptionPubkey(), prv3.PublicKey.Y) == 0 {
-						fmt.Printf("Found privatekey corresponding to %v", prv3.PublicKey.Y)
 						work.timelockPrivateKeys = append(work.timelockPrivateKeys, prv3)
-					} else {
-						log.Error("too late to include this transaction.")
-						fmt.Printf("2 Couldn't find the publicKey %v\n%v\n%v\n", tx.EncryptionPubkey(), prv1.PublicKey.Y, prv2.PublicKey.Y)
+					} else if !(bytes.Compare(tx.EncryptionPubkey(), prv1.PublicKey.Y) == 0) {
+						log.Error("too late to include this transaction.", "hash", tx.Hash())
 						continue
 					}
 					temp := tx.Copy()
 					(*temp).SetMode(types.Delayed)
 					txs = append(txs, temp)
 				}
-				log.Info("radni: okayy")
 			}
 			if err := w.commitDelayedTransactions(work, txs, nil); err != nil {
-				log.Info("intoOo")
 				fmt.Println(err)
 				return nil, err
 			}
 		}
 		w.fillTransactions(nil, work)
 	}
-	log.Info("radni: ya inja")
 	return w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, work.txs, work.unclelist(), work.receipts)
 }
 
@@ -1348,8 +1329,6 @@ func (w *worker) commitWork(interrupt *int32, noempty bool, timestamp int64) {
 		w.commit(work.copy(), nil, false, start)
 	}
 
-	log.Info("in oskol chie?!")
-
 	// Fill pending transactions from the txpool
 	err = w.fillTransactions(interrupt, work)
 	if errors.Is(err, errBlockInterruptedByNewHead) {
@@ -1378,7 +1357,6 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		// Create a local environment copy, avoid the data race with snapshot state.
 		// https://github.com/ethereum/go-ethereum/issues/24299
 		env := env.copy()
-		log.Info("radni: az to in miad?")
 		block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, env.unclelist(), env.receipts)
 		if err != nil {
 			return err

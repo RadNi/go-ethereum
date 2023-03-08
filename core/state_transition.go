@@ -17,20 +17,16 @@
 package core
 
 import (
-	"encoding/hex"
 	"fmt"
-	"github.com/ethereum/go-ethereum/crypto/elgamal"
-	"math"
-	"math/big"
-	"strconv"
-
 	"github.com/ethereum/go-ethereum/common"
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/crypto/elgamal"
 	"github.com/ethereum/go-ethereum/params"
+	"math"
+	"math/big"
 )
 
 var emptyCodeHash = crypto.Keccak256Hash(nil)
@@ -195,9 +191,6 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // state and would never be accepted within a block.
 func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (*ExecutionResult, error) {
 	x := NewStateTransition(evm, msg, gp)
-	if msg.PrivateKey() != nil {
-		fmt.Printf("x: %v %v\n", msg.PrivateKey().X, msg.PrivateKey().PublicKey.Y)
-	}
 	return x.TransitionDb()
 }
 
@@ -221,10 +214,6 @@ func (st *StateTransition) checkGas() error {
 	if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
 		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, want)
 	}
-
-	log.Info("radni: checkGas:")
-	log.Info(strconv.Itoa(int(uint64(*st.gp))))
-	log.Info(strconv.Itoa(int(st.msg.Gas())))
 
 	if uint64(*st.gp) < st.msg.Gas() {
 		return ErrGasLimitReached
@@ -323,56 +312,30 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	//if st.msg.Type() == types.EncryptedTxType {
 	mode := st.msg.Mode()
 	var decryptedTo []byte
-	log.Info("inja hastam")
-	log.Info(strconv.Itoa(int(mode)))
-	log.Info("radni: badesh")
-	log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
-	log.Info(st.msg.From().Hex())
-	//log.Info(st.msg.To().Hex())
-	fmt.Println(hex.EncodeToString(st.msg.Data()))
 	var inclusionGasCost uint64 = 21000
 	//log.Info(st.msg.Data())
 	//log.Info(st.msg.Value())
 	if mode == types.Delayed {
-		log.Info("dare az koja miad?1")
 		prv := st.msg.PrivateKey()
-		fmt.Printf("via: %v %v\n", st.msg.PrivateKey().PublicKey.Y, st.msg.PrivateKey().X)
-		//prv := rsa.ImportPrivateKey()
 		decryptedData, e := elgamal.DecryptMulti(st.msg.EncryptedData(), types.CopyTimelockPrivatekey(prv))
 		if e != nil {
 			return nil, e
 		}
-		fmt.Printf("this: %v\n", st.msg.EncryptedTo())
-		fmt.Printf("decrypted to: %v\n", decryptedTo)
-		fmt.Printf("via: %v %v\n", st.msg.PrivateKey().PublicKey.Y, st.msg.PrivateKey().X)
 		if e != nil {
 			return nil, e
 		}
 		st.data = decryptedData
-		//st.msg.UpdateData(decryptedData)
 		decryptedTo, _ = elgamal.DecryptMulti(st.msg.EncryptedTo(), types.CopyTimelockPrivatekey(prv))
-		fmt.Printf("after update: %v\n%v\n%v\n", st.msg.To(), st.msg.Data(), decryptedTo)
-		//st.msg.data = decryptedData
-		//st.msg.to = decryptedTo
-		//}
-	} else {
-		log.Info("dare az koja miad?2")
 	}
 
 	switch mode {
 	case types.Normal:
-		log.Info("gas game")
-		log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
 		if err := st.preCheck(); err != nil {
 			return nil, err
 		}
-		log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
 		st.buyGas(st.msg.Gas())
-		log.Info(strconv.FormatUint(*(*uint64)(st.gp), 10))
-		log.Info("gas game ended")
 	case types.Encrypted:
 		if err := st.preCheck(); err != nil {
-			log.Info("radni: error1")
 			return nil, err
 		}
 		st.buyGas(inclusionGasCost)
@@ -411,20 +374,15 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		gas, err = IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, rules.IsHomestead, rules.IsIstanbul)
 	}
 	if err != nil {
-		log.Info("radni: error2")
 		return nil, err
 	}
 	if st.gas < gas {
-		log.Info("radni: error3")
-		log.Info(strconv.Itoa(int(st.gas)))
-		log.Info(strconv.Itoa(int(gas)))
 		return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gas, gas)
 	}
 	st.gas -= gas
 
 	// Check clause 6
 	if msg.Value().Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.From(), msg.Value()) {
-		log.Info("radni: error4")
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From().Hex())
 	}
 
@@ -455,13 +413,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		if contractCreation {
 			ret, _, st.gas, vmerr = st.evm.CreateDelayed(sender, st.data, st.gas, st.value, msg.Nonce())
 		} else {
-			log.Info("radni: executing delayed")
 			addr := common.BytesToAddress(decryptedTo)
-			log.Info((*(st.evm.StateDB.GetBalance(addr))).String())
 			// Increment the nonce for the next transaction
-			//st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 			ret, st.gas, vmerr = st.evm.Call(sender, addr, st.data, st.gas, st.value)
-			log.Info((*(st.evm.StateDB.GetBalance(addr))).String())
 		}
 	}
 
@@ -486,13 +440,6 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		fee.Mul(fee, effectiveTip)
 		st.state.AddBalance(st.evm.Context.Coinbase, fee)
 	}
-
-	log.Info("radni: ExecutionResult")
-	//log.Info(string(st.gasUsed()))
-	fmt.Println(vmerr)
-	log.Info(string(ret))
-
-	log.Info("radni: resid be tahesh?")
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),

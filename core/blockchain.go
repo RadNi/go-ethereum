@@ -1669,7 +1669,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals, setHead bool)
 		// Process block using the parent state as reference point
 		substart := time.Now()
 		receipts, logs, usedGas, err := bc.processor.Process(block, statedb, bc.vmConfig)
-		fmt.Printf("hereeooo %v\n", block.TimelockPublickey())
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			atomic.StoreUint32(&followupInterrupt, 1)
@@ -2224,7 +2223,6 @@ func (bc *BlockChain) updateFutureBlocks() {
 	for {
 		select {
 		case <-futureTimer.C:
-			log.Info("radni: that is this one !")
 			bc.procFutureBlocks()
 		case <-bc.quit:
 			return
